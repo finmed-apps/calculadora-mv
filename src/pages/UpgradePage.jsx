@@ -3,44 +3,45 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useState } from 'react';
 
+// Os benefícios mensais equivalentes:
+// 6 meses por 65€  →  10,83 €/mês
+// Anual    por 100€ →  8,33 €/mês
+
 const PLANS = [
   {
-    id: 'monthly',
-    name: 'Mensal',
-    price: '12 €',
-    cadence: '/mês',
-    priceEnv: 'VITE_STRIPE_PRICE_MONTHLY',
-    mode: 'subscription',
-    sub: 'Cancele a qualquer momento.',
-  },
-  {
-    id: 'annual',
-    name: 'Anual',
-    price: '99 €',
-    cadence: '/ano',
-    priceEnv: 'VITE_STRIPE_PRICE_ANNUAL',
-    mode: 'subscription',
-    sub: 'Equivalente a 8,25 €/mês.',
-    badge: 'POUPA ~30%',
-    highlight: true,
+    id: 'one_off_6m',
+    name: '6 meses',
+    price: '65 €',
+    cadence: 'pagamento único',
+    equivalent: '≈ 10,83 €/mês',
+    priceEnv: 'VITE_STRIPE_PRICE_ONE_OFF_6M',
+    mode: 'payment',
+    features: [
+      'Simulações ilimitadas durante 6 meses',
+      'Histórico completo de simulações',
+      'Relatórios PDF com branding FINMED',
+      'Suporte por email',
+    ],
   },
   {
     id: 'one_off_12m',
-    name: '12 meses (pagamento único)',
-    price: '89 €',
-    cadence: 'únicos',
+    name: 'Anual',
+    price: '100 €',
+    cadence: 'pagamento único',
+    equivalent: '≈ 8,33 €/mês',
     priceEnv: 'VITE_STRIPE_PRICE_ONE_OFF_12M',
     mode: 'payment',
-    sub: 'Sem renovação automática.',
+    badge: 'POUPA ~23%',
+    highlight: true,
+    features: [
+      'Simulações ilimitadas durante 12 meses',
+      'Histórico completo de simulações',
+      'Relatórios PDF com branding FINMED',
+      'Suporte prioritário por email e telefone',
+      'Acesso a webinars trimestrais sobre fiscalidade imobiliária',
+      'Análise gratuita de 1 caso real pela equipa FINMED',
+    ],
   },
-];
-
-const FEATURES = [
-  'Simulações ilimitadas',
-  'Histórico permanente',
-  'Exportação de relatórios PDF',
-  'Relatórios com branding FINMED',
-  'Suporte prioritário',
 ];
 
 export function UpgradePage() {
@@ -61,7 +62,7 @@ export function UpgradePage() {
         return;
       }
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { priceId, mode: plan.mode },
+        body: { priceId, mode: plan.mode, planKind: plan.id },
       });
       if (error) throw error;
       if (data?.url) {
@@ -90,45 +91,47 @@ export function UpgradePage() {
         </p>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-4 mb-10">
+      <div className="grid sm:grid-cols-2 gap-5 max-w-3xl mx-auto">
         {PLANS.map((p) => (
-          <div key={p.id} className={`bg-fm-paper rounded-2xl border-2 p-6 relative ${p.highlight ? 'border-fm-yellow shadow-fm-yellow' : 'border-fm-border'}`}>
+          <div
+            key={p.id}
+            className={`bg-fm-paper rounded-2xl border-2 p-7 sm:p-8 relative ${p.highlight ? 'border-fm-yellow shadow-fm-yellow' : 'border-fm-border'}`}
+          >
             {p.badge && (
-              <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-fm-yellow text-fm-green-dark px-3 py-1 rounded-full text-[11px] font-bold tracking-widest uppercase">
+              <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-fm-yellow text-fm-green-dark px-3 py-1 rounded-full text-[11px] font-bold tracking-widest uppercase whitespace-nowrap">
                 {p.badge}
               </span>
             )}
-            <h3 className="font-bold text-fm-green-dark mb-1">{p.name}</h3>
-            <div className="my-3">
+
+            <h3 className="font-bold text-fm-green-dark text-lg mb-1">{p.name}</h3>
+            <div className="mt-3 mb-1">
               <span className="font-display font-bold text-4xl text-fm-green-dark">{p.price}</span>
-              <span className="text-fm-text-mute text-sm ml-1">{p.cadence}</span>
             </div>
-            <p className="text-sm text-fm-text-soft mb-5">{p.sub}</p>
+            <p className="text-sm text-fm-text-soft mb-1">{p.cadence}</p>
+            <p className="text-xs text-fm-text-mute mb-5">{p.equivalent}</p>
+
             <button
               onClick={() => handleCheckout(p)}
               disabled={loading === p.id}
-              className={`btn w-full justify-center ${p.highlight ? 'btn-primary' : 'btn-dark'} disabled:opacity-50`}
+              className={`btn w-full justify-center mb-6 ${p.highlight ? 'btn-primary' : 'btn-dark'} disabled:opacity-50`}
             >
               {loading === p.id ? 'A redirecionar…' : 'Subscrever →'}
             </button>
+
+            <ul className="space-y-2.5 pt-5 border-t border-fm-border">
+              {p.features.map((f) => (
+                <li key={f} className="flex items-start gap-2 text-sm text-fm-text-soft">
+                  <Check size={16} className="text-fm-success mt-0.5 flex-shrink-0" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         ))}
       </div>
 
-      <div className="bg-fm-ivory rounded-2xl border border-fm-border p-7">
-        <h2 className="font-bold text-fm-green-dark mb-4">Tudo o que está incluído:</h2>
-        <ul className="grid sm:grid-cols-2 gap-2">
-          {FEATURES.map((f) => (
-            <li key={f} className="flex items-start gap-2 text-fm-text-soft">
-              <Check size={16} className="text-fm-success mt-0.5 flex-shrink-0" />
-              <span>{f}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <p className="text-center text-fm-text-mute text-xs mt-8">
-        Pagamento seguro processado pela Stripe. Cancele a qualquer momento na sua conta.
+      <p className="text-center text-fm-text-mute text-xs mt-10">
+        Pagamento seguro processado pela Stripe. Sem renovação automática — paga apenas uma vez pelo período escolhido.
       </p>
     </main>
   );

@@ -19,12 +19,13 @@ export function useAccess(userId) {
       if (cancelled) return;
       if (error) {
         console.error('Access fetch error:', error);
-        setAccess({ hasPaidAccess: false, planStatus: 'free', planKind: null, loading: false });
+        setAccess({ hasPaidAccess: false, planStatus: 'free', planKind: null, planRenewsAt: null, loading: false });
       } else {
         setAccess({
           hasPaidAccess: data?.has_paid_access ?? false,
           planStatus: data?.plan_status ?? 'free',
           planKind: data?.plan_kind ?? null,
+          planRenewsAt: data?.plan_renews_at ?? null,
           loading: false,
         });
       }

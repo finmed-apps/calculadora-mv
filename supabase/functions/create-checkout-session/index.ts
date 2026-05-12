@@ -38,7 +38,7 @@ serve(async (req) => {
     const { data: { user }, error: userErr } = await userClient.auth.getUser();
     if (userErr || !user) return json({ error: 'Unauthorized' }, 401);
 
-    const { priceId, mode } = await req.json();
+    const { priceId, mode, planKind } = await req.json();
     if (!priceId || !mode) return json({ error: 'Missing priceId or mode' }, 400);
     if (!['subscription', 'payment'].includes(mode)) {
       return json({ error: 'Invalid mode' }, 400);
@@ -74,8 +74,11 @@ serve(async (req) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${APP_URL}/conta?checkout=success`,
       cancel_url: `${APP_URL}/upgrade?checkout=canceled`,
-      // Para one-off, metadata indica a duração (12 meses) que o webhook vai usar
-      metadata: mode === 'payment' ? { kind: 'one_off_12m', user_id: user.id } : { user_id: user.id },
+      // Metadata: passa o planKind para o webhook saber quantos meses dar
+      metadata: {
+        user_id: user.id,
+        kind: planKind || (mode === 'payment' ? 'one_off_12m' : 'subscription'),
+      },
     });
 
     return json({ url: session.url });

@@ -1,70 +1,72 @@
 // supabase/functions/generate-pdf/index.ts
 //
-// Gera PDF do relatório de simulação usando Puppeteer (via Browserless ou
-// Puppeteer-core + Chromium na Edge — em Supabase Functions o mais fácil
-// é chamar uma API externa de PDF rendering ou usar deno-puppeteer).
-//
-// Estratégia simples e fiável: usamos a API gratuita do Browserless
-// (ou alternativa) com um template HTML inline. Para a v1 do MVP, geramos
-// HTML formatado para impressão e o browser do utilizador faz print-to-PDF
-// ao abrir o URL — não há custo de infra.
-//
-// Esta versão devolve HTML pronto a imprimir (window.print() automático).
-// Se quiseres PDF "real" gerado no servidor, troca por chamada ao Browserless
-// (ver comentários abaixo).
+// Gera HTML imprimível do relatório de simulação.
+// Aceita autenticação via header Authorization OU ?token=... na URL
+// (porque window.open não consegue mandar headers).
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-);
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+const SUPABASE_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
 const fmtEuro = (v: number) =>
   new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0);
 const fmtPct = (v: number) =>
   new Intl.NumberFormat('pt-PT', { style: 'percent', maximumFractionDigits: 1 }).format(v || 0);
 const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' });
+  iso ? new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
 
 serve(async (req) => {
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
   if (!id) return new Response('Missing id', { status: 400 });
 
-  // Autenticar
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader) return new Response('Unauthorized', { status: 401 });
+  // Auth: aceitar token via header OU query param
+  let token = req.headers.get('Authorization')?.replace('Bearer ', '');
+  if (!token) token = url.searchParams.get('token') || undefined;
+  if (!token) return new Response('Unauthorized', { status: 401 });
 
-  const userClient = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_ANON_KEY')!,
-    { global: { headers: { Authorization: authHeader } } },
-  );
+  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
   const { data: { user } } = await userClient.auth.getUser();
   if (!user) return new Response('Unauthorized', { status: 401 });
 
-  // Buscar a simulação (RLS valida ownership via service_role)
+  // Buscar simulação + profile do utilizador
   const { data: sim, error } = await supabase
     .from('simulations')
-    .select('*, profiles(email, full_name)')
+    .select('*')
     .eq('id', id)
     .eq('user_id', user.id)
     .single();
 
   if (error || !sim) return new Response('Not found', { status: 404 });
 
-  const html = renderHtml(sim);
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email, full_name, phone, avatar_url')
+    .eq('id', user.id)
+    .single();
+
+  const html = renderHtml(sim, profile);
   return new Response(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   });
 });
 
-function renderHtml(sim: any) {
+function renderHtml(sim: any, profile: any) {
   const inp = sim.inputs || {};
   const out = sim.outputs || {};
   const isHPP = inp.scenario === 'hpp';
+
+  const userName = profile?.full_name || profile?.email || 'Cliente';
+  const userEmail = profile?.email || '';
+  const userPhone = profile?.phone || '';
+  const avatarUrl = profile?.avatar_url || '';
 
   return `<!DOCTYPE html>
 <html lang="pt-PT">
@@ -75,41 +77,77 @@ function renderHtml(sim: any) {
   @page { size: A4; margin: 18mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: 'Inter', -apple-system, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
     color: #1e2b13; line-height: 1.55;
   }
-  .header { display: flex; justify-content: space-between; align-items: end; padding-bottom: 18px; border-bottom: 2px solid #2d3f1f; margin-bottom: 30px; }
-  .brand { font-weight: 800; letter-spacing: 2px; font-size: 14px; color: #2d3f1f; }
-  .meta  { text-align: right; font-size: 12px; color: #5a6451; }
-  h1 { font-family: 'Fraunces', serif; font-size: 28px; color: #1e2b13; margin: 24px 0 8px; }
-  h2 { font-family: 'Fraunces', serif; font-size: 18px; color: #2d3f1f; margin: 24px 0 10px; }
-  .label-name { font-size: 14px; color: #5a6451; margin-bottom: 18px; }
-  .hero { background: #2d3f1f; color: white; border-radius: 12px; padding: 28px; margin-bottom: 22px; }
-  .hero-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #f4c542; font-weight: bold; }
-  .hero-value { font-family: 'Fraunces', serif; font-size: 56px; color: #f4c542; font-weight: 700; margin-top: 6px; line-height: 1; }
-  .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e4dfc9; font-size: 14px; }
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 18px; border-bottom: 2px solid #2d3f1f; margin-bottom: 30px;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .brand { font-weight: 800; letter-spacing: 2px; font-size: 16px; color: #2d3f1f; }
+  .meta  { text-align: right; font-size: 12px; color: #5a6451; line-height: 1.55; }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    object-fit: cover; border: 2px solid #2d3f1f;
+  }
+  .avatar-fallback {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: #f4c542; color: #1e2b13;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 16px;
+  }
+  h1 { font-family: Georgia, serif; font-size: 26px; color: #1e2b13; margin: 24px 0 4px; font-weight: 700; }
+  h2 { font-family: Georgia, serif; font-size: 17px; color: #2d3f1f; margin: 24px 0 10px; }
+  .scenario-label { font-size: 13px; color: #5a6451; margin-bottom: 18px; }
+  .hero {
+    background: #2d3f1f; color: white; border-radius: 12px;
+    padding: 26px 28px; margin-bottom: 22px;
+  }
+  .hero-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #f4c542; font-weight: bold; }
+  .hero-value { font-family: Georgia, serif; font-size: 50px; color: #f4c542; font-weight: 700; margin-top: 4px; line-height: 1; }
+  .row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #e4dfc9; font-size: 13.5px; }
   .row .lbl { color: #5a6451; }
   .row .val { font-weight: 700; font-variant-numeric: tabular-nums; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .card { border: 1px solid #e4dfc9; border-radius: 8px; padding: 14px 16px; }
-  .card .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #8a8e7f; font-weight: bold; }
-  .card .val { font-family: 'Fraunces', serif; font-size: 20px; color: #1e2b13; margin-top: 4px; font-variant-numeric: tabular-nums; }
-  .footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid #e4dfc9; font-size: 11px; color: #8a8e7f; line-height: 1.5; }
-  .disclaimer { background: #faf6ec; border-left: 4px solid #c97a1d; padding: 12px 14px; margin-top: 18px; font-size: 12px; color: #6b3f0d; border-radius: 4px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card { border: 1px solid #e4dfc9; border-radius: 8px; padding: 12px 14px; }
+  .card .lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 1px; color: #8a8e7f; font-weight: bold; }
+  .card .val { font-family: Georgia, serif; font-size: 18px; color: #1e2b13; margin-top: 3px; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .footer {
+    margin-top: 36px; padding-top: 14px;
+    border-top: 1px solid #e4dfc9;
+    font-size: 10.5px; color: #8a8e7f; line-height: 1.5;
+  }
+  .disclaimer {
+    background: #faf6ec; border-left: 4px solid #c97a1d;
+    padding: 11px 14px; margin-top: 18px;
+    font-size: 11.5px; color: #6b3f0d; border-radius: 4px;
+  }
+  @media print {
+    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
 </style>
 </head>
-<body onload="window.print()">
+<body onload="setTimeout(() => window.print(), 300)">
 
 <div class="header">
-  <div class="brand">≡· FINMED</div>
+  <div class="header-left">
+    ${avatarUrl
+      ? `<img class="avatar" src="${escapeHtml(avatarUrl)}" alt="">`
+      : `<div class="avatar-fallback">${escapeHtml(getInitials(userName))}</div>`}
+    <div>
+      <div style="font-size: 13px; font-weight: 700;">${escapeHtml(userName)}</div>
+      <div style="font-size: 11px; color: #5a6451;">${escapeHtml(userEmail)}${userPhone ? ' · ' + escapeHtml(userPhone) : ''}</div>
+    </div>
+  </div>
   <div class="meta">
-    Relatório de Simulação · ${fmtDate(sim.created_at)}<br>
-    <strong>${sim.profiles?.email ?? ''}</strong>
+    <div class="brand">FINMED</div>
+    <div>Relatório · ${fmtDate(sim.created_at)}</div>
   </div>
 </div>
 
-<h1>${sim.label || 'Simulação de Mais-Valia'}</h1>
-<div class="label-name">${isHPP ? 'Cenário: HPP com reinvestimento' : 'Cenário: Caso geral (tributável)'}</div>
+<h1>${escapeHtml(sim.label || 'Simulação de Mais-Valia')}</h1>
+<div class="scenario-label">${isHPP ? 'Cenário: HPP com reinvestimento' : 'Cenário: Caso geral (tributável)'}</div>
 
 <div class="hero">
   <div class="hero-label">IRS estimado sobre a mais-valia</div>
@@ -147,10 +185,22 @@ ${isHPP ? `
 
 <div class="footer">
   <strong>FINMED</strong> · Especialistas em Fiscalidade Imobiliária<br>
-  Este relatório é gerado automaticamente pela calculadora de Mais-Valias FINMED.<br>
-  Os valores apresentados são estimativos e não substituem consultoria profissional.
+  Relatório gerado automaticamente pela calculadora FINMED. Valores estimativos.
 </div>
 
 </body>
 </html>`;
+}
+
+function escapeHtml(s: string): string {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]!));
+}
+
+function getInitials(name: string): string {
+  if (!name) return '?';
+  if (name.includes('@')) return name.split('@')[0].slice(0, 2).toUpperCase();
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return parts[0].slice(0, 2).toUpperCase();
 }

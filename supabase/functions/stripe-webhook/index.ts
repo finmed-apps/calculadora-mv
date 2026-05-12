@@ -94,15 +94,17 @@ serve(async (req) => {
 // ============================================================
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.user_id;
+  const planKind = session.metadata?.kind;  // 'one_off_6m' ou 'one_off_12m'
   if (!userId) {
     console.error('No user_id in session metadata');
     return;
   }
 
   if (session.mode === 'payment') {
-    // One-off pass (12 meses)
+    // One-off pass — duração baseada no planKind
+    const months = planKind === 'one_off_6m' ? 6 : 12;
     const validUntil = new Date();
-    validUntil.setFullYear(validUntil.getFullYear() + 1);
+    validUntil.setMonth(validUntil.getMonth() + months);
 
     await supabase.from('one_time_passes').insert({
       user_id: userId,
@@ -117,7 +119,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       .from('profiles')
       .update({
         plan_status: 'active',
-        plan_kind: 'one_off_12m',
+        plan_kind: planKind || 'one_off_12m',
         plan_renews_at: validUntil.toISOString(),
       })
       .eq('id', userId);

@@ -1,22 +1,22 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, History, User, Crown } from 'lucide-react';
+import { LogOut, History, Crown } from 'lucide-react';
 import { Logo } from './Logo';
+import { Avatar } from './Avatar';
 import { useAuth } from '../hooks/useAuth';
 import { useAccess } from '../hooks/useAccess';
+import { useProfile } from '../hooks/useProfile';
 
 export function Header() {
   const { user, signOut } = useAuth();
   const access = useAccess(user?.id);
+  const { profile } = useProfile(user?.id);
   const nav = useNavigate();
 
   return (
     <header className="bg-fm-green text-white">
       <div className="max-w-6xl mx-auto px-5 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3">
-          <Logo variant="white" className="h-6" />
-          <span className="hidden sm:inline text-xs uppercase tracking-widest text-fm-yellow font-bold">
-            Mais-Valias
-          </span>
+          <Logo variant="white" className="h-6 sm:h-7 w-auto" />
         </Link>
 
         {user ? (
@@ -33,8 +33,14 @@ export function Header() {
             <Link to="/historico" className="p-2 rounded-lg hover:bg-fm-green-soft transition-colors" title="Histórico">
               <History size={18} />
             </Link>
-            <Link to="/conta" className="p-2 rounded-lg hover:bg-fm-green-soft transition-colors" title="Conta">
-              <User size={18} />
+            <Link to="/conta" className="hover:opacity-80 transition-opacity" title="A minha conta">
+              <Avatar
+                url={profile?.avatar_url}
+                name={profile?.full_name}
+                email={user.email}
+                size={32}
+                className="ring-2 ring-fm-green-soft"
+              />
             </Link>
             <button
               onClick={async () => { await signOut(); nav('/'); }}

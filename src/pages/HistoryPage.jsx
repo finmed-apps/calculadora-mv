@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
-import { Trash2, Edit3, FileDown, FileText } from 'lucide-react';
+import { Trash2, Edit3, FileDown, FileText, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useSimulations } from '../hooks/useSimulations';
 import { formatEuro, formatDate } from '../lib/calc';
+import { supabase } from '../lib/supabase';
 
 export function HistoryPage() {
   const { user } = useAuth();
@@ -25,16 +26,20 @@ export function HistoryPage() {
     setEditingId(null);
   }
 
-  function exportPdf(id) {
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-pdf?id=${id}`;
+  async function exportPdf(id) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-pdf?id=${id}&token=${session?.access_token}`;
     window.open(url, '_blank');
   }
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-8 sm:py-12">
-      <div className="mb-6">
-        <h1 className="font-display font-bold text-3xl text-fm-green-dark mb-1">As suas simulações</h1>
-        <p className="text-fm-text-soft">{items.length} simulações guardadas.</p>
+      <div className="mb-6 flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="font-display font-bold text-3xl text-fm-green-dark mb-1">As suas simulações</h1>
+          <p className="text-fm-text-soft">{items.length} simulações guardadas.</p>
+        </div>
+        <Link to="/" className="btn btn-primary">Nova simulação →</Link>
       </div>
 
       {items.length === 0 ? (
@@ -61,21 +66,18 @@ export function HistoryPage() {
                 <tr key={s.id} className="hover:bg-fm-ivory transition-colors">
                   <td className="px-5 py-4">
                     {editingId === s.id ? (
-                      <div className="flex gap-2">
-                        <input
-                          autoFocus
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
-                          onBlur={saveEdit}
-                          className="input py-1.5 text-sm"
-                        />
-                      </div>
+                      <input
+                        autoFocus
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                        onBlur={saveEdit}
+                        className="input py-1.5 text-sm"
+                      />
                     ) : (
-                      <button onClick={() => startEdit(s)} className="text-left">
-                        <span className="font-semibold text-fm-green-dark">{s.label || 'Sem nome'}</span>
-                        <Edit3 size={12} className="inline ml-2 text-fm-text-mute" />
-                      </button>
+                      <Link to={`/?load=${s.id}`} className="font-semibold text-fm-green-dark hover:text-fm-green-soft">
+                        {s.label || 'Sem nome'}
+                      </Link>
                     )}
                   </td>
                   <td className="px-5 py-4 hidden sm:table-cell">
@@ -85,10 +87,16 @@ export function HistoryPage() {
                   <td className="px-5 py-4 hidden md:table-cell text-sm text-fm-text-soft">{formatDate(s.created_at)}</td>
                   <td className="px-5 py-4 text-right">
                     <div className="inline-flex gap-1">
+                      <Link to={`/?load=${s.id}`} className="p-2 rounded-lg hover:bg-fm-border-soft text-fm-text-soft" title="Abrir">
+                        <Eye size={16} />
+                      </Link>
+                      <button onClick={() => startEdit(s)} className="p-2 rounded-lg hover:bg-fm-border-soft text-fm-text-soft" title="Renomear">
+                        <Edit3 size={16} />
+                      </button>
                       <button onClick={() => exportPdf(s.id)} className="p-2 rounded-lg hover:bg-fm-border-soft text-fm-text-soft" title="Exportar PDF">
                         <FileDown size={16} />
                       </button>
-                      <button onClick={() => confirm('Apagar esta simulação?') && remove(s.id)} className="p-2 rounded-lg hover:bg-fm-danger/10 text-fm-danger" title="Apagar">
+                      <button onClick={() => { if (confirm('Apagar esta simulação?')) remove(s.id); }} className="p-2 rounded-lg hover:bg-fm-danger/10 text-fm-danger" title="Apagar">
                         <Trash2 size={16} />
                       </button>
                     </div>

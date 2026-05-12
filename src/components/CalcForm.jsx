@@ -10,8 +10,31 @@ const EMPTY = {
   hpp: { dividaBanco: 0, novaValor: 0, novaPercent: 0 },
 };
 
-export function CalcForm({ scenario, onCancel, onCalculate }) {
-  const [data, setData] = useState(EMPTY);
+// Converte inputs guardados em DB (que podem ter despesas como totalDespesas) para o estado do form
+function hydratePrefill(inputs) {
+  return {
+    dataCompra: inputs.dataCompra || '',
+    dataVenda: inputs.dataVenda || '',
+    valorCompra: inputs.valorCompra ?? '',
+    valorVenda: inputs.valorVenda ?? '',
+    despesas: {
+      escritura: inputs.despesas?.escritura ?? 0,
+      selo: inputs.despesas?.selo ?? 0,
+      imt: inputs.despesas?.imt ?? 0,
+      cert: inputs.despesas?.cert ?? 0,
+      comissao: inputs.despesas?.comissao ?? 0,
+      melhoria: inputs.despesas?.melhoria ?? 0,
+    },
+    hpp: {
+      dividaBanco: inputs.hpp?.dividaBanco ?? 0,
+      novaValor: inputs.hpp?.novaValor ?? 0,
+      novaPercent: inputs.hpp?.novaPercent ?? 0,
+    },
+  };
+}
+
+export function CalcForm({ scenario, prefill, onCancel, onCalculate }) {
+  const [data, setData] = useState(() => prefill ? hydratePrefill(prefill) : EMPTY);
   const [phase, setPhase] = useState('A');
 
   const isHPP = scenario === 'hpp';
