@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: theme('colors.fm.cream');
+    color: theme('colors.fm.text');
+    line-height: 1.55;
+  }
+  h1, h2, h3, .display {
+    font-family: 'Fraunces', Georgia, serif;
+    letter-spacing: -0.01em;
+  }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-[14.5px] cursor-pointer border-2 border-transparent transition-all;
+  }
+  .btn-primary {
+    @apply bg-fm-yellow text-fm-green-dark border-fm-yellow hover:bg-fm-yellow-dark hover:border-fm-yellow-dark hover:-translate-y-px hover:shadow-fm-yellow;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-fm-green-dark border-fm-border hover:bg-fm-ivory hover:border-fm-green-soft;
+  }
+  .btn-dark {
+    @apply bg-fm-green text-fm-paper border-fm-green hover:bg-fm-green-dark hover:border-fm-green-dark;
+  }
+  .input {
+    @apply w-full px-3.5 py-3 border-2 border-fm-border rounded-lg bg-fm-paper text-fm-text text-[15px] transition-all;
+    @apply focus:outline-none focus:border-fm-yellow focus:ring-2 focus:ring-fm-yellow/20;
+    font-feature-settings: 'tnum';
+  }
+  .label {
+    @apply block text-[13.5px] font-semibold text-fm-text mb-1.5;
+  }
+  .help {
+    @apply text-[12.5px] text-fm-text-mute mt-1.5 leading-snug;
+  }
+}
