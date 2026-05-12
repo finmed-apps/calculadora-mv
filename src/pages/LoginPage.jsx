@@ -16,7 +16,8 @@ export function LoginPage() {
   // Se já está logado, redireciona
   useEffect(() => {
     if (user) {
-      const dest = location.state?.from || '/';
+      const queryFrom = new URLSearchParams(location.search).get('from');
+      const dest = location.state?.from || queryFrom || '/app';
       nav(dest, { replace: true });
     }
   }, [user, nav, location]);
@@ -29,7 +30,7 @@ export function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: window.location.origin + '/',
+        emailRedirectTo: window.location.origin + '/app',
       },
     });
     if (error) {

@@ -39,7 +39,7 @@ export function HistoryPage() {
           <h1 className="font-display font-bold text-3xl text-fm-green-dark mb-1">As suas simulações</h1>
           <p className="text-fm-text-soft">{items.length} simulações guardadas.</p>
         </div>
-        <Link to="/" className="btn btn-primary">Nova simulação →</Link>
+        <Link to="/app" className="btn btn-primary">Nova simulação →</Link>
       </div>
 
       {items.length === 0 ? (
@@ -47,7 +47,7 @@ export function HistoryPage() {
           <FileText className="mx-auto text-fm-text-mute mb-3" size={36} />
           <h2 className="font-bold text-fm-green-dark mb-2">Ainda não tem simulações</h2>
           <p className="text-fm-text-soft text-sm mb-4">Faça a sua primeira simulação para começar.</p>
-          <Link to="/" className="btn btn-primary">Nova simulação →</Link>
+          <Link to="/app" className="btn btn-primary">Nova simulação →</Link>
         </div>
       ) : (
         <div className="bg-fm-paper rounded-2xl border border-fm-border overflow-hidden">
@@ -75,7 +75,7 @@ export function HistoryPage() {
                         className="input py-1.5 text-sm"
                       />
                     ) : (
-                      <Link to={`/?load=${s.id}`} className="font-semibold text-fm-green-dark hover:text-fm-green-soft">
+                      <Link to={`/app?load=${s.id}`} className="font-semibold text-fm-green-dark hover:text-fm-green-soft">
                         {s.label || 'Sem nome'}
                       </Link>
                     )}
@@ -87,7 +87,7 @@ export function HistoryPage() {
                   <td className="px-5 py-4 hidden md:table-cell text-sm text-fm-text-soft">{formatDate(s.created_at)}</td>
                   <td className="px-5 py-4 text-right">
                     <div className="inline-flex gap-1">
-                      <Link to={`/?load=${s.id}`} className="p-2 rounded-lg hover:bg-fm-border-soft text-fm-text-soft" title="Abrir">
+                      <Link to={`/app?load=${s.id}`} className="p-2 rounded-lg hover:bg-fm-border-soft text-fm-text-soft" title="Abrir">
                         <Eye size={16} />
                       </Link>
                       <button onClick={() => startEdit(s)} className="p-2 rounded-lg hover:bg-fm-border-soft text-fm-text-soft" title="Renomear">

@@ -50,7 +50,7 @@ export function UpgradePage() {
 
   async function handleCheckout(plan) {
     if (!user) {
-      window.location.href = '/login';
+      window.location.href = '/login?from=/app/upgrade';
       return;
     }
     setLoading(plan.id);

@@ -1,6 +1,7 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { RequireAuth } from './components/RequireAuth';
+import { LandingPage } from './pages/LandingPage';
 import { CalculatorPage } from './pages/CalculatorPage';
 import { LoginPage } from './pages/LoginPage';
 import { HistoryPage } from './pages/HistoryPage';
@@ -9,20 +10,34 @@ import { UpgradePage } from './pages/UpgradePage';
 
 export default function App() {
   const location = useLocation();
-  const hideHeader = location.pathname === '/login';
+  const isLanding = location.pathname === '/';
+  const isLogin = location.pathname === '/login';
+
+  // LP e Login têm header próprio (ou nenhum). App tem o Header standard.
+  const showStandardHeader = !isLanding && !isLogin;
 
   return (
     <div className="min-h-screen flex flex-col">
-      {!hideHeader && <Header />}
+      {showStandardHeader && <Header />}
       <Routes>
-        <Route path="/" element={<CalculatorPage />} />
+        {/* PUBLIC */}
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/historico" element={<RequireAuth><HistoryPage /></RequireAuth>} />
-        <Route path="/conta" element={<RequireAuth><AccountPage /></RequireAuth>} />
-        <Route path="/upgrade" element={<UpgradePage />} />
+
+        {/* APP (protegido) */}
+        <Route path="/app" element={<RequireAuth><CalculatorPage /></RequireAuth>} />
+        <Route path="/app/historico" element={<RequireAuth><HistoryPage /></RequireAuth>} />
+        <Route path="/app/conta" element={<RequireAuth><AccountPage /></RequireAuth>} />
+        <Route path="/app/upgrade" element={<RequireAuth><UpgradePage /></RequireAuth>} />
+
+        {/* Legacy redirects — quem tem links antigos não fica perdido */}
+        <Route path="/historico" element={<Navigate to="/app/historico" replace />} />
+        <Route path="/conta" element={<Navigate to="/app/conta" replace />} />
+        <Route path="/upgrade" element={<Navigate to="/app/upgrade" replace />} />
+
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <Footer />
+      {showStandardHeader && <Footer />}
     </div>
   );
 }

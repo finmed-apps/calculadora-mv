@@ -173,7 +173,7 @@ export function AccountPage() {
           </div>
         )}
         {!access.hasPaidAccess && (
-          <a href="/upgrade" className="btn btn-primary mt-4">Ver planos →</a>
+          <a href="/app/upgrade" className="btn btn-primary mt-4">Ver planos →</a>
         )}
       </section>
 

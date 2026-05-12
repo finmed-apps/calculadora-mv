@@ -61,7 +61,7 @@ export function CalculatorPage() {
 
   async function handleSave(label) {
     if (!user) {
-      nav('/login', { state: { from: '/' } });
+      nav('/login', { state: { from: '/app' } });
       return;
     }
     setSaving(true);
@@ -156,7 +156,7 @@ function RecentSimulations({ items }) {
         <h2 className="font-bold text-fm-green-dark flex items-center gap-2">
           <Clock size={18} /> Continuar de onde parou
         </h2>
-        <Link to="/historico" className="text-sm text-fm-green font-semibold hover:underline whitespace-nowrap">
+        <Link to="/app/historico" className="text-sm text-fm-green font-semibold hover:underline whitespace-nowrap">
           Ver todas →
         </Link>
       </div>
@@ -165,7 +165,7 @@ function RecentSimulations({ items }) {
         {items.map((sim) => (
           <Link
             key={sim.id}
-            to={`/?load=${sim.id}`}
+            to={`/app?load=${sim.id}`}
             className="group bg-fm-ivory border border-fm-border rounded-xl p-4 hover:border-fm-yellow hover:shadow-fm transition-all"
           >
             <div className="flex items-start justify-between gap-2 mb-2">

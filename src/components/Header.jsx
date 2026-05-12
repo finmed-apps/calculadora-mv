@@ -15,7 +15,7 @@ export function Header() {
   return (
     <header className="bg-fm-green text-white">
       <div className="max-w-6xl mx-auto px-5 py-4 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3">
+        <Link to="/app" className="flex items-center gap-3">
           <Logo variant="white" className="h-6 sm:h-7 w-auto" />
         </Link>
 
@@ -26,14 +26,14 @@ export function Header() {
                 <Crown size={12} /> PRO
               </span>
             ) : (
-              <Link to="/upgrade" className="hidden sm:inline-flex items-center gap-1.5 bg-fm-yellow text-fm-green-dark px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-fm-yellow-dark transition-colors">
+              <Link to="/app/upgrade" className="hidden sm:inline-flex items-center gap-1.5 bg-fm-yellow text-fm-green-dark px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-fm-yellow-dark transition-colors">
                 <Crown size={12} /> Fazer upgrade
               </Link>
             )}
-            <Link to="/historico" className="p-2 rounded-lg hover:bg-fm-green-soft transition-colors" title="Histórico">
+            <Link to="/app/historico" className="p-2 rounded-lg hover:bg-fm-green-soft transition-colors" title="Histórico">
               <History size={18} />
             </Link>
-            <Link to="/conta" className="hover:opacity-80 transition-opacity" title="A minha conta">
+            <Link to="/app/conta" className="hover:opacity-80 transition-opacity" title="A minha conta">
               <Avatar
                 url={profile?.avatar_url}
                 name={profile?.full_name}
