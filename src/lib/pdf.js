@@ -52,64 +52,98 @@ export function renderReportHtml({ simulation, profile }) {
 <meta charset="UTF-8">
 <title>Relatório Mais-Valias · FINMED</title>
 <style>
-  @page { size: A4; margin: 18mm; }
+  @page { size: A4; margin: 14mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    background: #e8e6dc;
+  }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
     color: #1e2b13;
-    line-height: 1.55;
+    line-height: 1.45;
+    font-size: 11px;
     background: white;
+    max-width: 210mm;
+    min-height: 297mm;
+    margin: 24px auto;
+    padding: 18mm 16mm;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+  @media print {
+    html { background: white; }
+    body {
+      margin: 0;
+      padding: 0;
+      max-width: none;
+      min-height: 0;
+      box-shadow: none;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
   }
   .header {
     display: flex; justify-content: space-between; align-items: center;
-    padding-bottom: 18px; border-bottom: 2px solid #2d3f1f;
-    margin-bottom: 30px;
+    padding-bottom: 12px; border-bottom: 2px solid #2d3f1f;
+    margin-bottom: 16px;
   }
-  .header-left { display: flex; align-items: center; gap: 14px; }
-  .brand { font-weight: 800; letter-spacing: 2px; font-size: 16px; color: #2d3f1f; }
-  .meta { text-align: right; font-size: 12px; color: #5a6451; line-height: 1.55; }
+  .header-left { display: flex; align-items: center; gap: 11px; }
+  .brand { font-weight: 800; letter-spacing: 2px; font-size: 13px; color: #2d3f1f; }
+  .meta { text-align: right; font-size: 10px; color: #5a6451; line-height: 1.5; }
   .avatar {
-    width: 44px; height: 44px; border-radius: 50%;
+    width: 36px; height: 36px; border-radius: 50%;
     object-fit: cover; border: 2px solid #2d3f1f;
   }
   .avatar-fallback {
-    width: 44px; height: 44px; border-radius: 50%;
+    width: 36px; height: 36px; border-radius: 50%;
     background: #f4c542; color: #1e2b13;
     display: flex; align-items: center; justify-content: center;
-    font-weight: bold; font-size: 16px;
+    font-weight: bold; font-size: 13px;
   }
-  h1 { font-family: Georgia, serif; font-size: 26px; color: #1e2b13; margin: 24px 0 4px; font-weight: 700; }
-  h2 { font-family: Georgia, serif; font-size: 17px; color: #2d3f1f; margin: 24px 0 10px; }
-  .scenario-label { font-size: 13px; color: #5a6451; margin-bottom: 18px; }
+  h1 {
+    font-family: Georgia, serif; font-size: 20px; color: #1e2b13;
+    margin: 14px 0 2px; font-weight: 700;
+  }
+  h2 {
+    font-family: Georgia, serif; font-size: 14px; color: #2d3f1f;
+    margin: 16px 0 8px;
+    page-break-after: avoid;
+  }
+  .scenario-label { font-size: 11px; color: #5a6451; margin-bottom: 12px; }
   .hero {
-    background: #2d3f1f; color: white; border-radius: 12px;
-    padding: 26px 28px; margin-bottom: 22px;
+    background: #2d3f1f; color: white; border-radius: 10px;
+    padding: 16px 22px; margin-bottom: 16px;
+    page-break-inside: avoid;
   }
-  .hero-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #f4c542; font-weight: bold; }
-  .hero-value { font-family: Georgia, serif; font-size: 50px; color: #f4c542; font-weight: 700; margin-top: 4px; line-height: 1; }
+  .hero-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #f4c542; font-weight: bold; }
+  .hero-value { font-family: Georgia, serif; font-size: 38px; color: #f4c542; font-weight: 700; margin-top: 2px; line-height: 1; }
+  .rows {
+    page-break-inside: avoid;
+  }
   .row {
     display: flex; justify-content: space-between;
-    padding: 7px 0; border-bottom: 1px solid #e4dfc9;
-    font-size: 13.5px;
+    padding: 5px 0; border-bottom: 1px solid #e4dfc9;
+    font-size: 11px;
   }
   .row .lbl { color: #5a6451; }
   .row .val { font-weight: 700; font-variant-numeric: tabular-nums; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .card { border: 1px solid #e4dfc9; border-radius: 8px; padding: 12px 14px; }
-  .card .lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 1px; color: #8a8e7f; font-weight: bold; }
-  .card .val { font-family: Georgia, serif; font-size: 18px; color: #1e2b13; margin-top: 3px; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    page-break-inside: avoid;
+  }
+  .card { border: 1px solid #e4dfc9; border-radius: 6px; padding: 8px 11px; }
+  .card .lbl { font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.8px; color: #8a8e7f; font-weight: bold; }
+  .card .val { font-family: Georgia, serif; font-size: 15px; color: #1e2b13; margin-top: 2px; font-variant-numeric: tabular-nums; font-weight: 700; }
   .footer {
-    margin-top: 36px; padding-top: 14px;
+    margin-top: 18px; padding-top: 10px;
     border-top: 1px solid #e4dfc9;
-    font-size: 10.5px; color: #8a8e7f; line-height: 1.5;
+    font-size: 9px; color: #8a8e7f; line-height: 1.4;
   }
   .disclaimer {
-    background: #faf6ec; border-left: 4px solid #c97a1d;
-    padding: 11px 14px; margin-top: 18px;
-    font-size: 11.5px; color: #6b3f0d; border-radius: 4px;
-  }
-  @media print {
-    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    background: #faf6ec; border-left: 3px solid #c97a1d;
+    padding: 8px 11px; margin-top: 12px;
+    font-size: 9.5px; color: #6b3f0d; border-radius: 3px;
+    line-height: 1.4;
+    page-break-inside: avoid;
   }
 </style>
 </head>
@@ -140,6 +174,7 @@ export function renderReportHtml({ simulation, profile }) {
 </div>
 
 <h2>Dados introduzidos</h2>
+<div class="rows">
 <div class="row"><span class="lbl">Data de aquisição</span><span class="val">${fmtDate(inp.dataCompra)}</span></div>
 <div class="row"><span class="lbl">Data de venda</span><span class="val">${fmtDate(inp.dataVenda)}</span></div>
 <div class="row"><span class="lbl">Valor de aquisição</span><span class="val">${fmtEuro(inp.valorCompra)}</span></div>
@@ -150,6 +185,7 @@ ${isHPP ? `
 <div class="row"><span class="lbl">Valor nova HPP</span><span class="val">${fmtEuro(inp.hpp?.novaValor)}</span></div>
 <div class="row"><span class="lbl">% financiada nova HPP</span><span class="val">${inp.hpp?.novaPercent ?? 0}%</span></div>
 ` : ''}
+</div>
 
 <h2>Resultados</h2>
 <div class="grid">
@@ -161,7 +197,7 @@ ${isHPP ? `
   <div class="card"><div class="lbl">Não reinvestido</div><div class="val">${fmtEuro(out.valorNaoReinvestido)}</div></div>
   ` : ''}
   <div class="card"><div class="lbl">Tributável final</div><div class="val">${fmtEuro(out.tributavelFinal)}</div></div>
-  <div class="card"><div class="lbl">Taxa efetiva</div><div class="val">${out.tributavelFinal > 0 ? fmtPct(out.taxaEfetiva) : '—'}</div></div>
+  <div class="card"><div class="lbl">Taxa efetiva</div><div class="val">${out.tributavelFinal > 0 ? fmtPct(out.taxaEfetiva) : 'n/a'}</div></div>
 </div>
 
 <div class="disclaimer">
@@ -179,27 +215,31 @@ ${isHPP ? `
 
 /**
  * Abre uma nova janela com o relatório e dispara print-to-PDF.
+ * Usa Blob + ObjectURL para dar à janela uma URL real (em vez de about:blank).
  * @param {object} args — mesmo formato de renderReportHtml
  */
 export function exportarPdf({ simulation, profile }) {
   const html = renderReportHtml({ simulation, profile });
 
-  // Abrir em nova janela
-  const win = window.open('', '_blank');
+  // Criar Blob com o HTML — dá-nos uma URL real
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+
+  const win = window.open(url, '_blank');
   if (!win) {
+    URL.revokeObjectURL(url);
     alert('O browser bloqueou a abertura da nova janela. Permita pop-ups para calc.finmed.pt e tente novamente.');
     return;
   }
 
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-
-  // Esperar fontes/imagens carregarem antes de chamar print
-  win.onload = () => {
+  // Disparar print quando a janela carregar
+  win.addEventListener('load', () => {
     setTimeout(() => {
       win.focus();
       win.print();
-    }, 400);
-  };
+    }, 500);
+  });
+
+  // Libertar a memória do Blob 30s depois (depois do print já ter sido disparado)
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
