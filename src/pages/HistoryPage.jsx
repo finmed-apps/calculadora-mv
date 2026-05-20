@@ -2,12 +2,14 @@ import { Link } from 'react-router-dom';
 import { Trash2, Edit3, FileDown, FileText, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useProfile } from '../hooks/useProfile';
 import { useSimulations } from '../hooks/useSimulations';
 import { formatEuro, formatDate } from '../lib/calc';
-import { supabase } from '../lib/supabase';
+import { exportarPdf } from '../lib/pdf';
 
 export function HistoryPage() {
   const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
   const { items, loading, updateLabel, remove } = useSimulations(user?.id);
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -26,10 +28,8 @@ export function HistoryPage() {
     setEditingId(null);
   }
 
-  async function exportPdf(id) {
-    const { data: { session } } = await supabase.auth.getSession();
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-pdf?id=${id}&token=${session?.access_token}`;
-    window.open(url, '_blank');
+  function exportPdf(sim) {
+    exportarPdf({ simulation: sim, profile });
   }
 
   return (
@@ -93,7 +93,7 @@ export function HistoryPage() {
                       <button onClick={() => startEdit(s)} className="p-2 rounded-lg hover:bg-fm-border-soft text-fm-text-soft" title="Renomear">
                         <Edit3 size={16} />
                       </button>
-                      <button onClick={() => exportPdf(s.id)} className="p-2 rounded-lg hover:bg-fm-border-soft text-fm-text-soft" title="Exportar PDF">
+                      <button onClick={() => exportPdf(s)} className="p-2 rounded-lg hover:bg-fm-border-soft text-fm-text-soft" title="Exportar PDF">
                         <FileDown size={16} />
                       </button>
                       <button onClick={() => { if (confirm('Apagar esta simulação?')) remove(s.id); }} className="p-2 rounded-lg hover:bg-fm-danger/10 text-fm-danger" title="Apagar">

@@ -4,14 +4,18 @@ import { FileText, ChevronRight, Clock } from 'lucide-react';
 import { ScenarioPicker } from '../components/ScenarioPicker';
 import { CalcForm } from '../components/CalcForm';
 import { Result } from '../components/Result';
+import { InfoScreen } from '../components/InfoScreen';
 import { calcular, formatEuro, formatDate } from '../lib/calc';
+import { exportarPdf } from '../lib/pdf';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { useProfile } from '../hooks/useProfile';
 import { useSimulations, useSimulation } from '../hooks/useSimulations';
 import { useAccess } from '../hooks/useAccess';
 
 export function CalculatorPage() {
   const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
   const access = useAccess(user?.id);
   const { items: recent, save } = useSimulations(user?.id, { limit: 3 });
   const nav = useNavigate();
@@ -80,15 +84,20 @@ export function CalculatorPage() {
     }
   }
 
-  async function handleExportPdf() {
-    if (!savedId) {
-      alert('Guarde a simulação primeiro para poder exportar em PDF.');
+  function handleExportPdf() {
+    if (!result) {
+      alert('Faça uma simulação antes de exportar o relatório.');
       return;
     }
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-pdf?id=${savedId}&token=${token}`;
-    window.open(url, '_blank');
+    // Construir o objeto simulation no mesmo formato que vinha da DB
+    const simulation = {
+      label: result.inputs?.label || 'Simulação',
+      scenario: result.inputs?.scenario,
+      inputs: result.inputs,
+      outputs: extractOutputs(result),
+      created_at: new Date().toISOString(),
+    };
+    exportarPdf({ simulation, profile });
   }
 
   function handleEdit() {
@@ -121,7 +130,13 @@ export function CalculatorPage() {
 
       {!scenario && !result && <ScenarioPicker onPick={handlePick} />}
 
-      {scenario && !result && (
+      {/* Cenários informativos (não passam por cálculo) */}
+      {scenario && !result && (scenario === 'pre1989' || scenario === 'estado') && (
+        <InfoScreen scenario={scenario} onBack={handleReset} />
+      )}
+
+      {/* Cenários com cálculo */}
+      {scenario && !result && (scenario === 'hpp' || scenario === 'geral') && (
         <CalcForm
           scenario={scenario}
           prefill={prefill}
