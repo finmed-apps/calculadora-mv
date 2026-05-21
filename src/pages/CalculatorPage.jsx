@@ -4,6 +4,7 @@ import { FileText, ChevronRight, Clock } from 'lucide-react';
 import { ScenarioPicker } from '../components/ScenarioPicker';
 import { CalcForm } from '../components/CalcForm';
 import { Result } from '../components/Result';
+import { Faq } from '../components/Faq';
 import { InfoScreen } from '../components/InfoScreen';
 import { calcular, formatEuro, formatDate } from '../lib/calc';
 import { exportarPdf } from '../lib/pdf';
@@ -146,16 +147,19 @@ export function CalculatorPage() {
       )}
 
       {result && (
-        <Result
-          result={result}
-          onEdit={handleEdit}
-          onReset={handleReset}
-          onSave={handleSave}
-          onExportPdf={handleExportPdf}
-          saving={saving}
-          savedId={savedId}
-          hasPaidAccess={access.hasPaidAccess}
-        />
+        <>
+          <Result
+            result={result}
+            onEdit={handleEdit}
+            onReset={handleReset}
+            onSave={handleSave}
+            onExportPdf={handleExportPdf}
+            saving={saving}
+            savedId={savedId}
+            hasPaidAccess={access.hasPaidAccess}
+          />
+          <Faq />
+        </>
       )}
     </main>
   );
