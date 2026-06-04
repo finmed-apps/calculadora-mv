@@ -19,21 +19,27 @@ const EMPTY = {
   // compat com código antigo:
   hasPaidAccess: false,
   planRenewsAt: null,
-  loading: true,
 };
 
 export function useAccess(userId) {
   const [access, setAccess] = useState(EMPTY);
+  // userId para o qual o `access` atual já foi confirmado. Enquanto isto
+  // não corresponder ao userId pedido, consideramos que ainda está a carregar
+  // — evita uma condição de corrida em que os guards (RequireAdmin/AccessGate)
+  // decidem com dados desatualizados e redirecionam por engano.
+  const [loadedFor, setLoadedFor] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!userId) {
-      setAccess({ ...EMPTY, loading: false });
+      setAccess(EMPTY);
+      setLoadedFor(null);
       return;
     }
     const { data, error } = await supabase.rpc('my_access');
     if (error) {
       console.error('Access fetch error:', error);
-      setAccess({ ...EMPTY, loading: false });
+      setAccess(EMPTY);
+      setLoadedFor(userId);
       return;
     }
     const a = data || {};
@@ -53,8 +59,8 @@ export function useAccess(userId) {
       // compat:
       hasPaidAccess: a.has_access ?? false,
       planRenewsAt: a.access_until ?? a.trial_ends_at ?? null,
-      loading: false,
     });
+    setLoadedFor(userId);
   }, [userId]);
 
   useEffect(() => {
@@ -63,5 +69,9 @@ export function useAccess(userId) {
     return () => { cancelled = true; };
   }, [refresh]);
 
-  return { ...access, refresh };
+  // loading derivado: se há userId mas ainda não confirmámos o acesso DELE,
+  // está a carregar (mesmo que `access` tenha valores antigos de outro user).
+  const loading = userId ? loadedFor !== userId : false;
+
+  return { ...access, loading, refresh };
 }
