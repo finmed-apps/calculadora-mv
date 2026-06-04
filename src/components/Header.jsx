@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, History, Crown } from 'lucide-react';
+import { LogOut, History, Crown, Shield, Clock } from 'lucide-react';
 import { Logo } from './Logo';
 import { Avatar } from './Avatar';
 import { useAuth } from '../hooks/useAuth';
@@ -21,15 +21,14 @@ export function Header() {
 
         {user ? (
           <div className="flex items-center gap-2 sm:gap-3">
-            {access.hasPaidAccess ? (
-              <span className="hidden sm:inline-flex items-center gap-1.5 bg-fm-yellow/20 text-fm-yellow px-2.5 py-1 rounded-full text-xs font-bold">
-                <Crown size={12} /> PRO
-              </span>
-            ) : (
-              <Link to="/app/upgrade" className="hidden sm:inline-flex items-center gap-1.5 bg-fm-yellow text-fm-green-dark px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-fm-yellow-dark transition-colors">
-                <Crown size={12} /> Fazer upgrade
+            {access.isAdmin && (
+              <Link to="/app/admin" className="hidden sm:inline-flex items-center gap-1.5 bg-white/10 text-white px-2.5 py-1 rounded-full text-xs font-bold hover:bg-white/20 transition-colors" title="Administração">
+                <Shield size={12} /> Admin
               </Link>
             )}
+
+            <AccessChip access={access} />
+
             <Link to="/app/historico" className="p-2 rounded-lg hover:bg-fm-green-soft transition-colors" title="Histórico">
               <History size={18} />
             </Link>
@@ -58,4 +57,39 @@ export function Header() {
       </div>
     </header>
   );
+}
+
+// Indicador de estado no header.
+// Durante o trial NÃO mostramos preços nem "upgrade" — apenas o estado.
+// Decisão da Luísa: o utilizador deve sentir que tem acesso pleno.
+function AccessChip({ access }) {
+  if (access.loading) return null;
+
+  if (access.state === 'active' || access.state === 'granted') {
+    return (
+      <span className="hidden sm:inline-flex items-center gap-1.5 bg-fm-yellow/20 text-fm-yellow px-2.5 py-1 rounded-full text-xs font-bold">
+        <Crown size={12} /> PRO
+      </span>
+    );
+  }
+
+  if (access.state === 'trial') {
+    const d = access.daysLeft;
+    return (
+      <span className="hidden sm:inline-flex items-center gap-1.5 bg-white/10 text-white px-2.5 py-1 rounded-full text-xs font-semibold" title="Acesso ativo">
+        <Clock size={12} /> Acesso ativo{typeof d === 'number' ? ` · ${d}d` : ''}
+      </span>
+    );
+  }
+
+  // Trial terminado (ou sem acesso) mas dentro da lista → pode ver planos.
+  if (access.state === 'expired' || access.state === 'none') {
+    return (
+      <Link to="/app/upgrade" className="inline-flex items-center gap-1.5 bg-fm-yellow text-fm-green-dark px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-fm-yellow-dark transition-colors">
+        <Crown size={12} /> Ver planos
+      </Link>
+    );
+  }
+
+  return null;
 }

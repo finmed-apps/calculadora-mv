@@ -1,9 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { Crown, LogOut, Camera, Check } from 'lucide-react';
+import { Crown, LogOut, Camera, Check, Clock } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
 import { useAuth } from '../hooks/useAuth';
 import { useAccess } from '../hooks/useAccess';
 import { useProfile } from '../hooks/useProfile';
+import { APP_VERSION } from '../App';
+
+function fmtDate(d) {
+  return d ? new Date(d).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+}
 
 export function AccountPage() {
   const { user, signOut } = useAuth();
@@ -141,45 +146,72 @@ export function AccountPage() {
         </form>
       </section>
 
-      {/* PLANO */}
+      {/* PLANO / ACESSO */}
       <section className="bg-fm-paper rounded-2xl border border-fm-border p-7 sm:p-8 mb-5">
         <h2 className="font-bold text-lg mb-5 flex items-center gap-2">
-          <Crown size={18} /> Plano
+          <Crown size={18} /> Acesso
         </h2>
         <div className="flex items-center justify-between py-3 border-b border-fm-border">
           <span className="text-fm-text-soft text-sm">Estado</span>
-          <span>
-            {access.hasPaidAccess
-              ? <span className="inline-flex items-center gap-1.5 bg-fm-yellow/30 text-fm-green-dark px-2.5 py-1 rounded-full text-xs font-bold"><Crown size={12} /> ATIVO</span>
-              : <span className="text-fm-text-mute text-sm">Plano gratuito</span>
-            }
-          </span>
+          <span><AccessBadge state={access.state} /></span>
         </div>
-        {access.planKind && (
+
+        {/* Durante o trial mostramos o acesso ativo e a data, SEM preços */}
+        {access.state === 'trial' && access.effectiveEnd && (
           <div className="flex items-center justify-between py-3 border-b border-fm-border">
-            <span className="text-fm-text-soft text-sm">Tipo</span>
-            <span className="font-semibold">
-              {access.planKind === 'one_off_6m' ? '6 meses (pagamento único)' :
-               access.planKind === 'one_off_12m' ? 'Anual (pagamento único)' : access.planKind}
-            </span>
+            <span className="text-fm-text-soft text-sm">Acesso até</span>
+            <span className="font-semibold">{fmtDate(access.effectiveEnd)}</span>
           </div>
         )}
-        {access.planRenewsAt && (
+
+        {(access.state === 'active' || access.state === 'granted') && access.effectiveEnd && (
           <div className="flex items-center justify-between py-3 border-b border-fm-border">
             <span className="text-fm-text-soft text-sm">Válido até</span>
+            <span className="font-semibold">{fmtDate(access.effectiveEnd)}</span>
+          </div>
+        )}
+
+        {access.state === 'active' && access.planKind && (
+          <div className="flex items-center justify-between py-3 border-b border-fm-border">
+            <span className="text-fm-text-soft text-sm">Plano</span>
             <span className="font-semibold">
-              {new Date(access.planRenewsAt).toLocaleDateString('pt-PT')}
+              {access.planKind === 'one_off_6m' ? '6 meses' :
+               access.planKind === 'one_off_12m' ? 'Anual' : access.planKind}
             </span>
           </div>
         )}
-        {!access.hasPaidAccess && (
+
+        {/* Mensagem contextual */}
+        {access.state === 'trial' && (
+          <p className="text-fm-text-mute text-sm mt-4">
+            Tens acesso completo à calculadora. Aproveita todas as simulações que precisares.
+          </p>
+        )}
+
+        {/* Só mostramos "Ver planos" (com preços) DEPOIS do trial terminar */}
+        {(access.state === 'expired' || access.state === 'none') && (
           <a href="/app/upgrade" className="btn btn-primary mt-4">Ver planos →</a>
         )}
       </section>
 
-      <button onClick={signOut} className="btn btn-ghost text-fm-danger border-fm-danger/30 hover:bg-fm-danger/5">
-        <LogOut size={16} /> Terminar sessão
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={signOut} className="btn btn-ghost text-fm-danger border-fm-danger/30 hover:bg-fm-danger/5">
+          <LogOut size={16} /> Terminar sessão
+        </button>
+        <span className="text-xs text-fm-text-mute">FINMED Calc · v{APP_VERSION}</span>
+      </div>
     </main>
   );
+}
+
+function AccessBadge({ state }) {
+  if (state === 'active' || state === 'granted')
+    return <span className="inline-flex items-center gap-1.5 bg-fm-yellow/30 text-fm-green-dark px-2.5 py-1 rounded-full text-xs font-bold"><Crown size={12} /> ATIVO</span>;
+  if (state === 'admin')
+    return <span className="inline-flex items-center gap-1.5 bg-fm-green text-white px-2.5 py-1 rounded-full text-xs font-bold">ADMIN</span>;
+  if (state === 'trial')
+    return <span className="inline-flex items-center gap-1.5 bg-fm-yellow/30 text-fm-green-dark px-2.5 py-1 rounded-full text-xs font-bold"><Clock size={12} /> ACESSO ATIVO</span>;
+  if (state === 'expired')
+    return <span className="text-fm-text-mute text-sm">Acesso terminado</span>;
+  return <span className="text-fm-text-mute text-sm">Sem acesso ativo</span>;
 }

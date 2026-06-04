@@ -1,12 +1,17 @@
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { RequireAuth } from './components/RequireAuth';
+import { RequireAdmin } from './components/RequireAdmin';
+import { AccessGate } from './components/AccessGate';
 import { LandingPage } from './pages/LandingPage';
 import { CalculatorPage } from './pages/CalculatorPage';
 import { LoginPage } from './pages/LoginPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { AccountPage } from './pages/AccountPage';
 import { UpgradePage } from './pages/UpgradePage';
+import { AdminPage } from './pages/AdminPage';
+
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
 
 export default function App() {
   const location = useLocation();
@@ -24,11 +29,16 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
 
-        {/* APP (protegido) */}
-        <Route path="/app" element={<RequireAuth><CalculatorPage /></RequireAuth>} />
-        <Route path="/app/historico" element={<RequireAuth><HistoryPage /></RequireAuth>} />
-        <Route path="/app/conta" element={<RequireAuth><AccountPage /></RequireAuth>} />
-        <Route path="/app/upgrade" element={<RequireAuth><UpgradePage /></RequireAuth>} />
+        {/* APP (protegido + gate de acesso) */}
+        <Route path="/app" element={<RequireAuth><AccessGate><CalculatorPage /></AccessGate></RequireAuth>} />
+        <Route path="/app/historico" element={<RequireAuth><AccessGate><HistoryPage /></AccessGate></RequireAuth>} />
+        {/* Conta e Upgrade são sempre acessíveis a quem está autenticado e na lista,
+            mesmo com trial expirado (allowUpgrade) — senão não conseguiriam comprar. */}
+        <Route path="/app/conta" element={<RequireAuth><AccessGate allowUpgrade><AccountPage /></AccessGate></RequireAuth>} />
+        <Route path="/app/upgrade" element={<RequireAuth><AccessGate allowUpgrade><UpgradePage /></AccessGate></RequireAuth>} />
+
+        {/* ADMIN */}
+        <Route path="/app/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
 
         {/* Legacy redirects — quem tem links antigos não fica perdido */}
         <Route path="/historico" element={<Navigate to="/app/historico" replace />} />
@@ -56,6 +66,7 @@ function Footer() {
   return (
     <footer className="bg-fm-green-dark text-fm-text-mute text-center py-7 mt-auto text-xs">
       FINMED · Calculadora informativa · {new Date().getFullYear()} · Valores estimativos
+      <span className="block mt-1 opacity-60">v{APP_VERSION}</span>
     </footer>
   );
 }

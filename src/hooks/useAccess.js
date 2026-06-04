@@ -1,37 +1,67 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
-export function useAccess(userId) {
-  const [access, setAccess] = useState({ hasPaidAccess: false, planStatus: 'free', planKind: null, loading: true });
+// Estado de acesso calculado no servidor (RPC my_access, SECURITY DEFINER).
+// state: 'admin' | 'active' | 'trial' | 'granted' | 'expired' | 'suspended' | 'not_allowed' | 'none'
+const EMPTY = {
+  hasAccess: false,
+  state: 'none',
+  isAdmin: false,
+  allowed: false,
+  isSuspended: false,
+  cohort: null,
+  trialEndsAt: null,
+  accessUntil: null,
+  effectiveEnd: null,
+  daysLeft: null,
+  planStatus: 'free',
+  planKind: null,
+  // compat com código antigo:
+  hasPaidAccess: false,
+  planRenewsAt: null,
+  loading: true,
+};
 
-  useEffect(() => {
+export function useAccess(userId) {
+  const [access, setAccess] = useState(EMPTY);
+
+  const refresh = useCallback(async () => {
     if (!userId) {
-      setAccess({ hasPaidAccess: false, planStatus: 'free', planKind: null, loading: false });
+      setAccess({ ...EMPTY, loading: false });
       return;
     }
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('v_user_access')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (cancelled) return;
-      if (error) {
-        console.error('Access fetch error:', error);
-        setAccess({ hasPaidAccess: false, planStatus: 'free', planKind: null, planRenewsAt: null, loading: false });
-      } else {
-        setAccess({
-          hasPaidAccess: data?.has_paid_access ?? false,
-          planStatus: data?.plan_status ?? 'free',
-          planKind: data?.plan_kind ?? null,
-          planRenewsAt: data?.plan_renews_at ?? null,
-          loading: false,
-        });
-      }
-    })();
-    return () => { cancelled = true; };
+    const { data, error } = await supabase.rpc('my_access');
+    if (error) {
+      console.error('Access fetch error:', error);
+      setAccess({ ...EMPTY, loading: false });
+      return;
+    }
+    const a = data || {};
+    setAccess({
+      hasAccess: a.has_access ?? false,
+      state: a.state ?? 'none',
+      isAdmin: a.is_admin ?? false,
+      allowed: a.allowed ?? false,
+      isSuspended: a.is_suspended ?? false,
+      cohort: a.cohort ?? null,
+      trialEndsAt: a.trial_ends_at ?? null,
+      accessUntil: a.access_until ?? null,
+      effectiveEnd: a.effective_end ?? null,
+      daysLeft: a.days_left ?? null,
+      planStatus: a.plan_status ?? 'free',
+      planKind: a.plan_kind ?? null,
+      // compat:
+      hasPaidAccess: a.has_access ?? false,
+      planRenewsAt: a.access_until ?? a.trial_ends_at ?? null,
+      loading: false,
+    });
   }, [userId]);
 
-  return access;
+  useEffect(() => {
+    let cancelled = false;
+    (async () => { if (!cancelled) await refresh(); })();
+    return () => { cancelled = true; };
+  }, [refresh]);
+
+  return { ...access, refresh };
 }
