@@ -33,7 +33,7 @@ export function LandingPage() {
 
         <div className="max-w-6xl mx-auto px-5 py-16 sm:py-24 relative">
           <span className="inline-block bg-fm-yellow text-fm-green-dark px-3 py-1 rounded-full text-[11px] font-bold tracking-widest uppercase mb-5">
-            Ferramenta gratuita · FINMED
+            Calculadora oficial · FINMED
           </span>
           <h1 className="font-display font-bold leading-[1.05] mb-5 max-w-3xl" style={{ fontSize: 'clamp(34px, 6vw, 60px)' }}>
             Calcula o IRS na venda do teu imóvel em <em className="text-fm-yellow not-italic italic font-medium">1 minuto</em>.

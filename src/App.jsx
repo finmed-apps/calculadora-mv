@@ -1,5 +1,6 @@
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Header } from './components/Header';
+import { TrialBanner } from './components/TrialBanner';
 import { RequireAuth } from './components/RequireAuth';
 import { RequireAdmin } from './components/RequireAdmin';
 import { AccessGate } from './components/AccessGate';
@@ -24,6 +25,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       {showStandardHeader && <Header />}
+      {showStandardHeader && <TrialBanner />}
       <Routes>
         {/* PUBLIC */}
         <Route path="/" element={<LandingPage />} />

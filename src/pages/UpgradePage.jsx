@@ -1,12 +1,12 @@
-import { Check, Crown } from 'lucide-react';
+import { Check, Crown, Clock, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { useAccess } from '../hooks/useAccess';
 import { useState } from 'react';
 
 // Os benefícios mensais equivalentes:
 // 6 meses por 65€  →  10,83 €/mês
 // Anual    por 100€ →  8,33 €/mês
-
 const PLANS = [
   {
     id: 'one_off_6m',
@@ -44,9 +44,15 @@ const PLANS = [
   },
 ];
 
+function fmtDate(d) {
+  return d ? new Date(d).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+}
+
 export function UpgradePage() {
   const { user } = useAuth();
+  const access = useAccess(user?.id);
   const [loading, setLoading] = useState(null);
+  const [notice, setNotice] = useState('');
 
   async function handleCheckout(plan) {
     if (!user) {
@@ -54,10 +60,12 @@ export function UpgradePage() {
       return;
     }
     setLoading(plan.id);
+    setNotice('');
     try {
       const priceId = import.meta.env[plan.priceEnv];
       if (!priceId) {
-        alert(`Price ID em falta para o plano ${plan.id}. Defina ${plan.priceEnv} nas variáveis de ambiente.`);
+        // Stripe ainda não está ligado — degrada com elegância (sem erro feio).
+        setNotice('Os pagamentos online vão estar disponíveis muito em breve. Para ativares já o teu acesso, fala com a equipa FINMED: suporte@finmed.pt');
         setLoading(null);
         return;
       }
@@ -72,24 +80,82 @@ export function UpgradePage() {
       }
     } catch (err) {
       console.error(err);
-      alert('Erro ao iniciar checkout: ' + err.message);
+      setNotice('Não foi possível iniciar o pagamento online neste momento. Tenta novamente daqui a pouco ou fala connosco: suporte@finmed.pt');
       setLoading(null);
     }
   }
 
+  if (access.loading) {
+    return (
+      <main className="max-w-5xl mx-auto px-5 py-16 text-center text-fm-text-mute text-sm">A carregar…</main>
+    );
+  }
+
+  // DECISÃO DA LUÍSA: durante o trial NÃO se mostram preços.
+  // Só quando o trial termina é que aparece a tabela de planos.
+  const trialActive = access.state === 'trial';
+  const alreadyPro = access.state === 'active' || access.state === 'granted' || access.state === 'admin';
+
+  if (trialActive) {
+    return (
+      <main className="max-w-xl mx-auto px-5 py-16 text-center">
+        <span className="inline-flex items-center gap-1.5 bg-fm-yellow/30 text-fm-green-dark px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase mb-4">
+          <Clock size={12} /> Acesso ativo
+        </span>
+        <h1 className="font-display font-bold text-fm-green-dark text-3xl mb-3">
+          Tens acesso completo à calculadora
+        </h1>
+        <p className="text-fm-text-soft mb-2">
+          Aproveita todas as simulações que precisares — sem limites.
+        </p>
+        {access.effectiveEnd && (
+          <p className="text-fm-text-mute text-sm mb-8">
+            O teu acesso está garantido até <strong>{fmtDate(access.effectiveEnd)}</strong>.
+            Perto dessa data avisamos-te com as opções para continuares.
+          </p>
+        )}
+        <a href="/app" className="btn btn-primary">← Voltar à calculadora</a>
+      </main>
+    );
+  }
+
+  if (alreadyPro) {
+    return (
+      <main className="max-w-xl mx-auto px-5 py-16 text-center">
+        <span className="inline-flex items-center gap-1.5 bg-fm-yellow text-fm-green-dark px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase mb-4">
+          <Crown size={12} /> Acesso Premium ativo
+        </span>
+        <h1 className="font-display font-bold text-fm-green-dark text-3xl mb-3">Já tens acesso PRO</h1>
+        {access.effectiveEnd && (
+          <p className="text-fm-text-soft mb-8">Válido até <strong>{fmtDate(access.effectiveEnd)}</strong>.</p>
+        )}
+        <a href="/app" className="btn btn-primary">← Voltar à calculadora</a>
+      </main>
+    );
+  }
+
+  // Trial terminado (expired) ou sem acesso (none) → mostrar planos.
   return (
     <main className="max-w-5xl mx-auto px-5 py-10 sm:py-16">
       <div className="text-center mb-10">
         <span className="inline-flex items-center gap-1.5 bg-fm-yellow text-fm-green-dark px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase mb-4">
-          <Crown size={12} /> Acesso Premium
+          <Crown size={12} /> Continua a usar a calculadora
         </span>
         <h1 className="font-display font-bold text-fm-green-dark text-3xl sm:text-4xl mb-3">
-          Desbloqueie todo o potencial da Calculadora FINMED
+          {access.state === 'expired' ? 'O teu período de acesso terminou' : 'Desbloqueia a Calculadora FINMED'}
         </h1>
         <p className="text-fm-text-soft max-w-2xl mx-auto">
-          Histórico ilimitado, relatórios PDF profissionais e suporte da equipa FINMED para confirmar cada simulação.
+          Escolhe um plano para continuares com simulações ilimitadas, histórico e
+          relatórios PDF profissionais com o apoio da equipa FINMED.
         </p>
       </div>
+
+      {notice && (
+        <div className="max-w-2xl mx-auto mb-8 bg-fm-yellow/15 border border-fm-yellow/40 text-fm-green-dark text-sm rounded-xl px-5 py-4 flex items-start gap-3">
+          <ShieldCheck size={18} className="flex-shrink-0 mt-0.5 text-fm-green" />
+          <span>{notice}</span>
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-5 max-w-3xl mx-auto">
         {PLANS.map((p) => (
@@ -131,7 +197,7 @@ export function UpgradePage() {
       </div>
 
       <p className="text-center text-fm-text-mute text-xs mt-10">
-        Pagamento seguro processado pela Stripe. Sem renovação automática — paga apenas uma vez pelo período escolhido.
+        Pagamento seguro processado pela Stripe. Sem renovação automática — pagas apenas uma vez pelo período escolhido.
       </p>
     </main>
   );

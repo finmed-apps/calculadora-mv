@@ -8,6 +8,7 @@ export function useAdmin() {
   const [config, setConfig] = useState(null);
   const [waitlist, setWaitlist] = useState([]);
   const [allowed, setAllowed] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,6 +29,11 @@ export function useAdmin() {
 
   const loadConfig = useCallback(async () => {
     try { setConfig(await wrap(supabase.rpc('admin_get_config'))); }
+    catch (e) { setError(e.message); }
+  }, []);
+
+  const loadStats = useCallback(async () => {
+    try { setStats(await wrap(supabase.rpc('admin_stats'))); }
     catch (e) { setError(e.message); }
   }, []);
 
@@ -63,6 +69,20 @@ export function useAdmin() {
   const massUnlock = (cohort) =>
     wrap(supabase.rpc('admin_mass_unlock', { p_cohort: cohort }));
 
+  const massGrantDays = (cohort, days) =>
+    wrap(supabase.rpc('admin_mass_grant_days', { p_cohort: cohort, p_days: days }));
+
+  const massSetTrial = (cohort, endsAtISO) =>
+    wrap(supabase.rpc('admin_mass_set_trial', { p_cohort: cohort, p_ends: endsAtISO }));
+
+  const addOrGrant = (email, fullName, days, cohort) =>
+    wrap(supabase.rpc('admin_add_or_grant', {
+      p_email: email, p_full_name: fullName || null, p_days: days ?? null, p_cohort: cohort,
+    }));
+
+  const deleteUser = (userId) =>
+    wrap(supabase.rpc('admin_delete_user', { p_user: userId }));
+
   const importAllowed = (rows, cohort) =>
     wrap(supabase.rpc('admin_import_allowed', { p_rows: rows, p_cohort: cohort }));
 
@@ -77,10 +97,11 @@ export function useAdmin() {
   };
 
   return {
-    users, config, waitlist, allowed, loading, error,
-    loadUsers, loadConfig, loadWaitlist, loadAllowed,
+    users, config, waitlist, allowed, stats, loading, error,
+    loadUsers, loadConfig, loadWaitlist, loadAllowed, loadStats,
     setSuspended, grantDays, setTrial, setAdmin, setAllowedFlag,
-    massLock, massUnlock, importAllowed, saveConfig,
+    massLock, massUnlock, massGrantDays, massSetTrial,
+    addOrGrant, deleteUser, importAllowed, saveConfig,
   };
 }
 
