@@ -14,11 +14,15 @@ import { WaitlistPage } from '../pages/WaitlistPage';
 // allowUpgrade=true nas rotas que devem ser sempre acessíveis a quem está
 // autenticado e na lista (ex.: a própria página de upgrade e a conta).
 export function AccessGate({ children, allowUpgrade = false }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const access = useAccess(user?.id);
   const location = useLocation();
 
-  if (access.loading) {
+  // CRÍTICO: só decidimos depois de a sessão estar confirmada (user conhecido)
+  // E o acesso desse user carregado. Caso contrário, há uma fração de segundo
+  // em que ainda não sabemos quem é o utilizador e concluiríamos "sem acesso"
+  // por engano, redirecionando indevidamente para a página de planos.
+  if (authLoading || !user || access.loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center text-fm-text-mute text-sm">
         A verificar o teu acesso…
