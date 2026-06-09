@@ -1,112 +1,130 @@
-# Guia de aplicação — Lançamento Masterclass (sem terminal)
+# Guia de aplicação — Lançamento da Masterclass (100% browser, sem terminal)
 
-Tudo o que se segue faz-se no **browser**: Supabase Dashboard, GitHub web e Vercel.
-Não é preciso CLI. Segue a ordem.
+Ordem recomendada. Faz de cima para baixo. Nada aqui precisa de CLI.
 
----
-
-## Passo 1 — Aplicar a migração de segurança no Supabase
-
-1. Abre o **Supabase Dashboard** → projeto `tlfoseohmaxnoqbfrymm` → **SQL Editor** → **New query**.
-2. Abre o ficheiro `supabase/migrations/20260603000000_access_admin_model.sql`, copia **tudo**, cola no editor.
-3. **Antes de correr**, vai ao fim do ficheiro (secção `12. SEED DE ADMINS`) e mete os emails certos:
-
-   ```sql
-   update public.profiles set is_admin = true, allowed = true
-   where lower(email) in (
-     lower('tomas@digitalplane.pt'),
-     lower('EMAIL_DA_MARTA@finmed.pt'),
-     lower('EMAIL_DA_LUISA@finmed.pt')
-   );
-   ```
-
-   > Cada pessoa só fica admin **depois de ter feito login pelo menos uma vez** (o perfil tem de existir). Se ainda não entraram, corre só este `update` outra vez mais tarde.
-4. Carrega em **Run**. Deve dizer *Success*. Pode correr-se mais que uma vez sem partir nada.
-
-Esta migração foi testada contra Postgres real (30 testes): um utilizador normal **não consegue** promover-se a admin, prolongar o próprio trial, dar-se acesso, nem ver dados de outros. Todas as ações de admin são verificadas no servidor.
+Resumo do que vais fazer:
+1. Aplicar 3 migrações SQL no Supabase (obrigatórias).
+2. (Opcional) Aplicar 2 migrações de email automático.
+3. Publicar o código novo (GitHub → Vercel faz deploy sozinho).
+4. Marcar os admins.
+5. Importar inscritos e configurar o trial.
+6. Mais tarde: ligar os pagamentos (ver `PAGAMENTOS.md`).
 
 ---
 
-## Passo 2 — (Opcional) Email automático de fim de trial
+## Passo 1 — Migrações SQL obrigatórias (Supabase → SQL Editor)
 
-Só se quiseres o email automático já agora. **Não bloqueia o lançamento** — o aviso "faltam X dias" aparece sempre na app.
+Corre estas **três**, por esta ordem. Cada uma: **New query** → colar o ficheiro todo → **Run**. São idempotentes (podes correr outra vez sem estragar nada).
 
-1. Supabase → **Database → Extensions** → ativar `pg_cron` e `pg_net`.
-2. Supabase → **Project Settings → Vault → New secret**: nome `RESEND_API_KEY`, valor `re_...`.
-3. **SQL Editor** → cola e corre `supabase/migrations/20260603010000_trial_email_cron.sql`.
+1. `supabase/migrations/20260603000000_access_admin_model.sql`
+   → modelo de acesso (trial + paywall), RLS endurecido, RPCs de admin, lista de espera.
+   **Antes de correr**, na secção final "12. SEED DE ADMINS", mete os emails certos (ver Passo 4).
+
+2. `supabase/migrations/20260603020000_admin_tools.sql`
+   → adicionar utilizador, conceder/estender em massa, estatísticas, eliminar conta.
+
+3. `supabase/migrations/20260603030000_launch_prep.sql`
+   → "fechar trial" em massa (o pagamento mantém o acesso) + registo de auditoria.
+
+Testadas contra PostgreSQL real (30 + 15 + 11 testes), incluindo os ataques de
+escalada de privilégios — um utilizador normal não consegue dar-se acesso nem ver
+dados de outros.
 
 ---
 
-## Passo 3 — Publicar o código novo (GitHub web → Vercel)
+## Passo 2 — (Opcional) Emails automáticos
 
-O Vercel faz deploy automático a cada commit no repo `finmed-calc`. Pelo GitHub web:
+Só se quiseres os emails automáticos. **Não são precisos para lançar.**
 
-1. Abre o repo no github.com.
-2. Para cada ficheiro novo/alterado abaixo, usa **Add file → Create new file** (ou abre o ficheiro → ✏️ Edit) e cola o conteúdo da pasta local.
+Pré-requisitos (uma vez):
+- Supabase → **Database → Extensions** → ativar `pg_net` (e `pg_cron` para o de fim de trial).
+- Supabase → **Project Settings → Vault → New secret**: `RESEND_API_KEY` = `re_...`.
 
-**Ficheiros novos:**
+Depois, no SQL Editor:
+- `supabase/migrations/20260603010000_trial_email_cron.sql` → aviso de fim de trial.
+- `supabase/migrations/20260603040000_welcome_email.sql` → email de boas-vindas no 1.º login.
+
+Ambas são seguras: se faltar a chave/extensão, não enviam e não partem o login.
+
+---
+
+## Passo 3 — Publicar o código (GitHub web → Vercel)
+
+O Vercel faz deploy automático a cada commit no repo `finmed-calc`. Pelo GitHub web,
+cria/edita cada ficheiro abaixo com o conteúdo da pasta local e faz **Commit**.
+
+**Ficheiros NOVOS:**
 - `src/components/AccessGate.jsx`
 - `src/components/RequireAdmin.jsx`
+- `src/components/TrialBanner.jsx`
+- `src/components/OnboardingModal.jsx`
+- `src/components/AdminGuide.jsx`
 - `src/pages/WaitlistPage.jsx`
 - `src/pages/AdminPage.jsx`
 - `src/hooks/useAdmin.js`
 - `supabase/migrations/20260603000000_access_admin_model.sql`
-- `supabase/migrations/20260603010000_trial_email_cron.sql`
+- `supabase/migrations/20260603020000_admin_tools.sql`
+- `supabase/migrations/20260603030000_launch_prep.sql`
+- `supabase/migrations/20260603010000_trial_email_cron.sql` (opcional)
+- `supabase/migrations/20260603040000_welcome_email.sql` (opcional)
 
-**Ficheiros alterados:**
+**Ficheiros ALTERADOS:**
 - `src/App.jsx`
 - `src/components/Header.jsx`
 - `src/hooks/useAccess.js`
 - `src/pages/AccountPage.jsx`
+- `src/pages/UpgradePage.jsx`
+- `src/pages/CalculatorPage.jsx`
+- `src/pages/LandingPage.jsx`
 - `vite.config.js`
 - `package.json` (versão → 1.0.0)
+- `supabase/functions/create-checkout-session/index.ts` (só relevante quando ligares o Stripe)
 
-3. Faz **Commit**. O Vercel reconstrói sozinho (~1-2 min). Confirma em vercel.com que o deploy ficou verde.
-
-> Dica: é mais simples arrastar a pasta inteira para o GitHub Desktop, mas se preferires 100% web, edita ficheiro a ficheiro como acima.
-
----
-
-## Passo 4 — Importar os inscritos da Masterclass
-
-1. Exporta a lista do Go High Level para **CSV ou Excel** com (pelo menos) uma coluna `email`. Opcional: `nome`, `plano`.
-2. Entra em `calc.finmed.pt/app/admin` (com a tua conta admin) → separador **Importar inscritos** → escolhe o ficheiro → confere a pré-visualização → **Importar**.
-
-A partir daqui, quem fizer login com um email da lista entra direto em trial. Quem não estiver na lista vê a página "Ainda não abrimos ao público".
+Confirma em vercel.com que o deploy ficou verde (~1-2 min).
 
 ---
 
-## Passo 5 — Configurar a data de início do trial
+## Passo 4 — Marcar os admins
 
-`calc.finmed.pt/app/admin` → **Definições**:
-- **Data de início do trial**: 11 jul (ou 18 jul, a Marta decide).
-- **Duração**: 30 dias.
-- **Abrir ao público**: deixar **DESLIGADO** até abrires oficialmente.
+Cada pessoa tem de ter **entrado uma vez** (para o perfil existir). Depois, no SQL Editor:
 
----
+```sql
+update public.profiles set is_admin = true, allowed = true
+where lower(email) in (
+  lower('tomas@digitalplane.pt'),
+  lower('EMAIL_DA_MARTA@finmed.pt'),
+  lower('EMAIL_DA_LUISA@finmed.pt')
+);
+```
 
-## Passo 6 — Dia 28 jul: trancar o trial em massa
-
-`calc.finmed.pt/app/admin` → **Utilizadores** → botão **Trancar tudo**.
-Suspende de uma vez todos os inscritos da Masterclass (segmento `masterclass_2026_07`).
-Há também **Reabrir** caso seja preciso desfazer.
-
----
-
-## O que a Marta precisa de saber (call de 5 min)
-
-- **/app/admin** é a área dela.
-- **Utilizadores**: pesquisar, ver estado, e em **Gerir** → suspender/reativar, dar dias extra, ajustar fim de trial.
-- **Importar inscritos**: carregar o CSV/Excel do GHL.
-- **Lista de espera**: ver/exportar quem tentou entrar sem estar na lista.
-- **Definições**: data de início do trial e abrir/fechar ao público.
-- **Trancar tudo**: o botão grande para fechar o trial a 28 jul.
+(Já vai no seed da migração 1 — basta editares os emails lá, ou correres isto à parte.)
 
 ---
 
-## Notas de segurança (porque é que isto é seguro)
+## Passo 5 — Importar inscritos e configurar o trial
 
-- As colunas de acesso (`is_admin`, `is_suspended`, `trial_ends_at`, `access_until`, `allowed`) **não têm permissão de escrita** para utilizadores normais — só funções de servidor verificadas (`SECURITY DEFINER` + `is_admin`) ou o `service_role` (webhooks) lhes mexem.
-- Mesmo que alguém force o URL `/app/admin`, todas as operações falham no servidor se não for admin.
-- Cada utilizador só vê o seu próprio perfil e as suas simulações (RLS). O admin **não** vê as simulações de ninguém — só gere acessos.
-- O cálculo de acesso vive num único sítio (`compute_access`), por isso não há caminhos inconsistentes.
+1. `calc.finmed.pt/app/admin` → **Importar inscritos** → carrega o CSV/Excel do Go High Level.
+2. **Definições** → confirma a **data de início do trial** (11 ou 18 jul) e mantém **"Abrir ao público" DESLIGADO**.
+3. Dia 28 jul → **Utilizadores → Ferramentas de segmento → Fechar trial**.
+
+> Na primeira vez que entrarem em `/app/admin`, a Marta e a Luísa vêem um guia. Podem
+> reabri-lo no botão **Ajuda** a qualquer momento.
+
+---
+
+## Passo 6 — Pagamentos (mais tarde, antes de ~10 ago)
+
+Ver **`PAGAMENTOS.md`** — criar produtos no Stripe, fazer deploy das 2 Edge Functions
+pelo dashboard do Supabase (sem CLI), webhook, variáveis no Vercel, e teste com cartão.
+Não bloqueia o 11 jul: durante o trial não se cobra.
+
+---
+
+## Notas de segurança
+
+- As colunas de acesso (`is_admin`, `is_suspended`, `trial_ends_at`, `access_until`, `allowed`)
+  não têm permissão de escrita para utilizadores normais — só funções de servidor
+  verificadas (admin) ou o `service_role` (webhooks).
+- `/app/admin` é protegido no servidor: mesmo forçando o URL, as operações falham se não fores admin.
+- Cada utilizador só vê o seu perfil e as suas simulações. O admin gere acessos mas não vê simulações alheias.
+- Tudo o que mexe em acessos fica registado no separador **Registo** (quem, sobre quem, quando).

@@ -13,11 +13,25 @@ import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { useSimulations, useSimulation } from '../hooks/useSimulations';
 import { useAccess } from '../hooks/useAccess';
+import { OnboardingModal, hasSeenOnboarding, markOnboardingSeen } from '../components/OnboardingModal';
 
 export function CalculatorPage() {
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
   const access = useAccess(user?.id);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Introdução no primeiro acesso (só para quem tem acesso ativo).
+  useEffect(() => {
+    if (!access.loading && access.hasAccess && !hasSeenOnboarding()) {
+      setShowOnboarding(true);
+    }
+  }, [access.loading, access.hasAccess]);
+
+  function closeOnboarding() {
+    markOnboardingSeen();
+    setShowOnboarding(false);
+  }
   const { items: recent, save } = useSimulations(user?.id, { limit: 3 });
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -122,6 +136,7 @@ export function CalculatorPage() {
   // --- RENDER ---
   return (
     <main className="max-w-6xl mx-auto px-5 py-8 sm:py-12 space-y-5">
+      <OnboardingModal open={showOnboarding} onClose={closeOnboarding} />
       {!result && <Hero />}
 
       {/* Histórico recente — só na home, com user logado e >0 simulações */}

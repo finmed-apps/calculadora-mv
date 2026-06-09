@@ -72,8 +72,8 @@ serve(async (req) => {
       mode: mode as 'subscription' | 'payment',
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${APP_URL}/conta?checkout=success`,
-      cancel_url: `${APP_URL}/upgrade?checkout=canceled`,
+      success_url: `${APP_URL}/app/conta?checkout=success`,
+      cancel_url: `${APP_URL}/app/upgrade?checkout=canceled`,
       // Metadata: passa o planKind para o webhook saber quantos meses dar
       metadata: {
         user_id: user.id,

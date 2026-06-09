@@ -4,6 +4,7 @@ import { Avatar } from '../components/Avatar';
 import { useAuth } from '../hooks/useAuth';
 import { useAccess } from '../hooks/useAccess';
 import { useProfile } from '../hooks/useProfile';
+import { resetOnboarding } from '../components/OnboardingModal';
 import { APP_VERSION } from '../App';
 
 function fmtDate(d) {
@@ -20,6 +21,7 @@ export function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [paymentDone, setPaymentDone] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -28,6 +30,19 @@ export function AccountPage() {
       setPhone(profile.phone || '');
     }
   }, [profile]);
+
+  // Regresso do checkout Stripe: confirma e atualiza o acesso.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      setPaymentDone(true);
+      // O webhook pode demorar uns segundos a registar o pagamento.
+      const t1 = setTimeout(() => access.refresh?.(), 1500);
+      const t2 = setTimeout(() => access.refresh?.(), 5000);
+      window.history.replaceState({}, '', '/app/conta');
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, []); // eslint-disable-line
 
   async function handleSave(e) {
     e.preventDefault();
@@ -67,6 +82,16 @@ export function AccountPage() {
   return (
     <main className="max-w-3xl mx-auto px-5 py-8 sm:py-12">
       <h1 className="font-display font-bold text-3xl text-fm-green-dark mb-6">A minha conta</h1>
+
+      {paymentDone && (
+        <div className="bg-fm-success/10 border border-fm-success/30 text-fm-green-dark rounded-xl px-5 py-4 mb-5 flex items-start gap-3">
+          <Check size={18} className="text-fm-success flex-shrink-0 mt-0.5" />
+          <div>
+            <div className="font-semibold">Pagamento recebido — obrigado!</div>
+            <div className="text-sm text-fm-text-soft">O teu acesso está a ser ativado. Se ainda aparecer como inativo, atualiza a página dentro de instantes.</div>
+          </div>
+        </div>
+      )}
 
       {/* IDENTIFICAÇÃO + foto */}
       <section className="bg-fm-paper rounded-2xl border border-fm-border p-7 sm:p-8 mb-5">
@@ -194,11 +219,19 @@ export function AccountPage() {
         )}
       </section>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <button onClick={signOut} className="btn btn-ghost text-fm-danger border-fm-danger/30 hover:bg-fm-danger/5">
           <LogOut size={16} /> Terminar sessão
         </button>
-        <span className="text-xs text-fm-text-mute">FINMED Calc · v{APP_VERSION}</span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => { resetOnboarding(); window.location.href = '/app'; }}
+            className="text-xs text-fm-text-mute hover:text-fm-green font-semibold"
+          >
+            Rever introdução
+          </button>
+          <span className="text-xs text-fm-text-mute">FINMED Calc · v{APP_VERSION}</span>
+        </div>
       </div>
     </main>
   );

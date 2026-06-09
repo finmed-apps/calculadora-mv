@@ -9,6 +9,7 @@ export function useAdmin() {
   const [waitlist, setWaitlist] = useState([]);
   const [allowed, setAllowed] = useState([]);
   const [stats, setStats] = useState(null);
+  const [audit, setAudit] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -34,6 +35,11 @@ export function useAdmin() {
 
   const loadStats = useCallback(async () => {
     try { setStats(await wrap(supabase.rpc('admin_stats'))); }
+    catch (e) { setError(e.message); }
+  }, []);
+
+  const loadAudit = useCallback(async () => {
+    try { setAudit(await wrap(supabase.rpc('admin_list_audit', { p_limit: 300 })) || []); }
     catch (e) { setError(e.message); }
   }, []);
 
@@ -97,8 +103,8 @@ export function useAdmin() {
   };
 
   return {
-    users, config, waitlist, allowed, stats, loading, error,
-    loadUsers, loadConfig, loadWaitlist, loadAllowed, loadStats,
+    users, config, waitlist, allowed, stats, audit, loading, error,
+    loadUsers, loadConfig, loadWaitlist, loadAllowed, loadStats, loadAudit,
     setSuspended, grantDays, setTrial, setAdmin, setAllowedFlag,
     massLock, massUnlock, massGrantDays, massSetTrial,
     addOrGrant, deleteUser, importAllowed, saveConfig,

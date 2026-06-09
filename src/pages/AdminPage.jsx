@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Users, Search, Shield, Lock, Unlock, Clock, Plus, Upload,
   Settings, ListChecks, RefreshCw, X, Crown, Ban, Check,
-  UserPlus, Trash2, Download, CalendarClock,
+  UserPlus, Trash2, Download, CalendarClock, ScrollText, HelpCircle,
 } from 'lucide-react';
 import { useAdmin, parseEnrolleesFile } from '../hooks/useAdmin';
+import { AdminGuide, hasSeenAdminGuide, markAdminGuideSeen } from '../components/AdminGuide';
 
 const DEFAULT_COHORT = 'masterclass_2026_07';
 
@@ -27,18 +28,30 @@ function fmtDate(d) {
 export function AdminPage() {
   const admin = useAdmin();
   const [tab, setTab] = useState('users');
+  const [showGuide, setShowGuide] = useState(false);
+
+  // Guia na primeira visita ao painel.
+  useEffect(() => {
+    if (!hasSeenAdminGuide()) setShowGuide(true);
+  }, []);
+  function closeGuide() { markAdminGuideSeen(); setShowGuide(false); }
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-5 py-8 sm:py-10">
+      <AdminGuide open={showGuide} onClose={closeGuide} />
       <div className="flex items-center gap-3 mb-6">
         <Shield className="text-fm-green" size={26} />
-        <h1 className="font-display font-bold text-2xl sm:text-3xl text-fm-green-dark">Administração</h1>
+        <h1 className="font-display font-bold text-2xl sm:text-3xl text-fm-green-dark flex-1">Administração</h1>
+        <button onClick={() => setShowGuide(true)} className="btn btn-ghost text-sm" title="Como funciona o painel">
+          <HelpCircle size={16} /> Ajuda
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-1.5 mb-6 border-b border-fm-border">
         <TabBtn active={tab === 'users'} onClick={() => setTab('users')} icon={Users}>Utilizadores</TabBtn>
         <TabBtn active={tab === 'import'} onClick={() => setTab('import')} icon={Upload}>Importar inscritos</TabBtn>
         <TabBtn active={tab === 'waitlist'} onClick={() => setTab('waitlist')} icon={ListChecks}>Lista de espera</TabBtn>
+        <TabBtn active={tab === 'audit'} onClick={() => setTab('audit')} icon={ScrollText}>Registo</TabBtn>
         <TabBtn active={tab === 'settings'} onClick={() => setTab('settings')} icon={Settings}>Definições</TabBtn>
       </div>
 
@@ -49,6 +62,7 @@ export function AdminPage() {
       {tab === 'users' && <UsersTab admin={admin} />}
       {tab === 'import' && <ImportTab admin={admin} />}
       {tab === 'waitlist' && <WaitlistTab admin={admin} />}
+      {tab === 'audit' && <AuditTab admin={admin} />}
       {tab === 'settings' && <SettingsTab admin={admin} />}
     </main>
   );
@@ -255,9 +269,9 @@ function MassTools({ admin, onDone }) {
 
         <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-fm-border">
           <Ban size={16} className="text-fm-danger" />
-          <span className="text-xs text-fm-text-mute flex-1 min-w-[160px]">Fechar o trial gratuito de todo o segmento (dia 28 jul).</span>
-          <button disabled={busy} onClick={() => run('Reabertos', () => admin.massUnlock(cohort))} className="btn btn-ghost text-xs disabled:opacity-50"><Unlock size={14} /> Reabrir</button>
-          <button disabled={busy} onClick={() => run('Trancados', () => admin.massLock(cohort), `Trancar o acesso de TODOS do segmento "${cohort}"?`)} className="btn text-xs bg-fm-danger text-white hover:opacity-90 disabled:opacity-50"><Lock size={14} /> Trancar tudo</button>
+          <span className="text-xs text-fm-text-mute flex-1 min-w-[160px]">Fechar o trial gratuito de todo o segmento (dia 28 jul). Termina o trial — quem já pagou mantém o acesso.</span>
+          <button disabled={busy} onClick={() => run('Trial reaberto', () => admin.massUnlock(cohort), `Voltar a dar trial a TODOS do segmento "${cohort}"?`)} className="btn btn-ghost text-xs disabled:opacity-50"><Unlock size={14} /> Reabrir trial</button>
+          <button disabled={busy} onClick={() => run('Trial terminado', () => admin.massLock(cohort), `Terminar o trial gratuito de TODOS do segmento "${cohort}"? Quem já pagou mantém o acesso.`)} className="btn text-xs bg-fm-danger text-white hover:opacity-90 disabled:opacity-50"><Lock size={14} /> Fechar trial</button>
         </div>
 
         {msg && <div className="text-xs text-fm-text-soft pt-1">{msg}</div>}
@@ -567,6 +581,66 @@ function WaitlistTab({ admin }) {
               <tr key={w.id} className="border-t border-fm-border">
                 <td className="px-4 py-2.5">{w.email}</td>
                 <td className="px-4 py-2.5 text-fm-text-soft">{fmtDate(w.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TAB: REGISTO (auditoria)
+// ============================================================
+const ACTION_LABEL = {
+  suspend: 'Suspendeu', reactivate: 'Reativou',
+  grant_admin: 'Tornou admin', revoke_admin: 'Removeu admin',
+  set_trial: 'Definiu fim de trial', grant_access: 'Concedeu acesso',
+  set_allowed: 'Alterou lista', delete_user: 'Eliminou conta',
+  update_config: 'Alterou definições', update_access: 'Alterou acesso',
+};
+
+function AuditTab({ admin }) {
+  useEffect(() => { admin.loadAudit(); /* eslint-disable-next-line */ }, []);
+
+  function fmtDetail(d) {
+    if (!d) return '';
+    return Object.entries(d).map(([k, v]) => {
+      if (v && typeof v === 'object' && 'para' in v) return `${k}: ${v.para ?? '—'}`;
+      return `${k}: ${v}`;
+    }).join(' · ');
+  }
+
+  return (
+    <div className="max-w-3xl">
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm text-fm-text-soft">{admin.audit.length} registo(s) — quem alterou acessos e quando</span>
+        <button onClick={() => admin.loadAudit()} className="btn btn-ghost text-sm"><RefreshCw size={15} /> Atualizar</button>
+      </div>
+      <div className="bg-fm-paper border border-fm-border rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-fm-ivory text-fm-text-mute text-xs uppercase">
+            <tr>
+              <th className="text-left px-4 py-3">Quando</th>
+              <th className="text-left px-4 py-3">Quem</th>
+              <th className="text-left px-4 py-3">Ação</th>
+              <th className="text-left px-4 py-3 hidden sm:table-cell">Sobre</th>
+            </tr>
+          </thead>
+          <tbody>
+            {admin.audit.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-fm-text-mute">Sem registos ainda.</td></tr>}
+            {admin.audit.map((a) => (
+              <tr key={a.id} className="border-t border-fm-border align-top">
+                <td className="px-4 py-2.5 text-fm-text-soft whitespace-nowrap">
+                  {new Date(a.created_at).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </td>
+                <td className="px-4 py-2.5 text-fm-text-soft">{a.actor_email || '—'}</td>
+                <td className="px-4 py-2.5">
+                  <span className="font-semibold text-fm-green-dark">{ACTION_LABEL[a.action] || a.action}</span>
+                  {a.target_email && <span className="text-fm-text-mute"> · {a.target_email}</span>}
+                </td>
+                <td className="px-4 py-2.5 text-fm-text-mute text-xs hidden sm:table-cell">{fmtDetail(a.detail)}</td>
               </tr>
             ))}
           </tbody>
