@@ -3,6 +3,7 @@ import {
   Users, Search, Shield, Lock, Unlock, Clock, Plus, Upload,
   Settings, ListChecks, RefreshCw, X, Crown, Ban, Check,
   UserPlus, Trash2, Download, CalendarClock, ScrollText, HelpCircle,
+  ArrowUp, ArrowDown, ArrowUpDown, Mail, LayoutDashboard, Wallet, TrendingUp, FileText,
 } from 'lucide-react';
 import { useAdmin, parseEnrolleesFile } from '../hooks/useAdmin';
 import { AdminGuide, hasSeenAdminGuide, markAdminGuideSeen } from '../components/AdminGuide';
@@ -24,10 +25,127 @@ function fmtDate(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
+function fmtDateTime(d) {
+  if (!d) return 'Nunca';
+  return new Date(d).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+const eur = (n) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Number(n) || 0);
+
+// Ordenação da tabela de utilizadores
+const STATE_RANK = { admin: 0, active: 1, granted: 2, trial: 3, expired: 4, suspended: 5, not_allowed: 6, none: 7 };
+function tsVal(d) { return d ? new Date(d).getTime() : -Infinity; }
+function sortValue(u, key) {
+  switch (key) {
+    case 'user': return (u.full_name || u.email || '').toLowerCase();
+    case 'state': return STATE_RANK[u.access?.state || 'none'] ?? 99;
+    case 'until': return tsVal(u.access?.effective_end || u.trial_ends_at || u.access_until);
+    case 'sims': return Number(u.simulations_count) || 0;
+    case 'last': return tsVal(u.last_sign_in_at);
+    case 'created':
+    default: return tsVal(u.created_at);
+  }
+}
+
+function SortHeader({ label, k, sort, onSort, className }) {
+  const active = sort.key === k;
+  const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown;
+  return (
+    <th className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(k)}
+        className={`inline-flex items-center gap-1 font-semibold hover:text-fm-green-dark transition-colors ${active ? 'text-fm-green-dark' : ''}`}
+      >
+        {label}
+        <Icon size={12} className={active ? '' : 'opacity-30'} />
+      </button>
+    </th>
+  );
+}
+
+// Normaliza para pesquisa (minúsculas, sem acentos)
+function norm(s) {
+  return (s || '').toString().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+}
+
+// Legenda dos estados
+const STATE_DESC = [
+  ['admin', 'Administrador da aplicação.'],
+  ['active', 'Pagou — acesso ativo.'],
+  ['granted', 'Acesso dado manualmente pela equipa (VIP / exceção).'],
+  ['trial', 'Período gratuito da Masterclass a decorrer.'],
+  ['expired', 'O acesso terminou — a pessoa vê a página de planos.'],
+  ['suspended', 'Bloqueado manualmente (mesmo que tenha pago).'],
+  ['not_allowed', 'O email não consta dos inscritos — vê a lista de espera, sem acesso.'],
+  ['none', 'Sem trial nem pagamento ativo.'],
+];
+
+function StateLegend() {
+  return (
+    <details className="mb-4 bg-fm-paper border border-fm-border rounded-xl">
+      <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-fm-green-dark">
+        O que significam os estados?
+      </summary>
+      <div className="px-4 pb-4 grid sm:grid-cols-2 gap-x-6 gap-y-2">
+        {STATE_DESC.map(([k, desc]) => {
+          const lbl = STATE_LABEL[k];
+          return (
+            <div key={k} className="flex items-start gap-2 text-sm">
+              <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${lbl.c}`}>{lbl.t}</span>
+              <span className="text-fm-text-soft">{desc}</span>
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
+// Checkbox "selecionar tudo" com estado indeterminado
+function CheckAll({ checked, indeterminate, onChange }) {
+  const ref = useRef(null);
+  useEffect(() => { if (ref.current) ref.current.indeterminate = !!indeterminate && !checked; }, [indeterminate, checked]);
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} className="w-4 h-4 accent-fm-green cursor-pointer align-middle" />;
+}
+
+// Barra de ações em massa sobre os utilizadores selecionados
+function BulkBar({ ids, admin, onApplied, onClear }) {
+  const [busy, setBusy] = useState(false);
+  const [days, setDays] = useState(14);
+  const [trialDate, setTrialDate] = useState('');
+  const n = ids.length;
+  async function run(fn, confirmMsg) {
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    setBusy(true);
+    try { await fn(); onApplied(); }
+    catch (e) { alert('Erro: ' + e.message); setBusy(false); }
+  }
+  const sm = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors';
+  return (
+    <div className="sticky top-2 z-20 mb-3 bg-fm-green-dark text-white rounded-xl px-3 py-2.5 shadow-fm-lg flex flex-wrap items-center gap-2">
+      <span className="font-semibold text-sm px-1">{n} selecionado(s)</span>
+      <div className="flex-1 min-w-[8px]" />
+      <button disabled={busy} onClick={() => run(() => admin.bulkGrantDays(ids, 180))} className={`${sm} bg-white/15 hover:bg-white/25`}>Pago 6m</button>
+      <button disabled={busy} onClick={() => run(() => admin.bulkGrantDays(ids, 365))} className={`${sm} bg-white/15 hover:bg-white/25`}>Pago 1 ano</button>
+      <span className="inline-flex items-center gap-1 bg-white/10 rounded-lg pl-2">
+        <input type="number" min={1} value={days} onChange={(e) => setDays(parseInt(e.target.value) || 0)} className="w-12 bg-transparent text-white text-xs py-1.5 outline-none" />
+        <button disabled={busy || !days} onClick={() => run(() => admin.bulkGrantDays(ids, days))} className={`${sm} bg-white/15 hover:bg-white/25`}>+ dias</button>
+      </span>
+      <span className="inline-flex items-center gap-1 bg-white/10 rounded-lg pl-2">
+        <input type="date" value={trialDate} onChange={(e) => setTrialDate(e.target.value)} className="bg-transparent text-white text-xs py-1.5 outline-none" />
+        <button disabled={busy || !trialDate} onClick={() => run(() => admin.bulkSetTrial(ids, new Date(trialDate + 'T23:59:59').toISOString()))} className={`${sm} bg-white/15 hover:bg-white/25`}>Fim de trial</button>
+      </span>
+      <button disabled={busy} onClick={() => run(() => admin.bulkSetSuspended(ids, false))} className={`${sm} bg-white/15 hover:bg-white/25`}>Reativar</button>
+      <button disabled={busy} onClick={() => run(() => admin.bulkSetSuspended(ids, true), `Suspender ${n} utilizador(es)?`)} className={`${sm} bg-fm-danger text-white hover:opacity-90`}>Suspender</button>
+      <button disabled={busy} onClick={() => run(() => admin.bulkDelete(ids), `Eliminar ${n} conta(s)? Não há volta. (admins e a tua conta são ignorados)`)} className={`${sm} bg-fm-danger text-white hover:opacity-90`}>Eliminar</button>
+      <button disabled={busy} onClick={onClear} className={`${sm} bg-white/10 hover:bg-white/20`}>Limpar</button>
+    </div>
+  );
+}
 
 export function AdminPage() {
   const admin = useAdmin();
-  const [tab, setTab] = useState('users');
+  const [tab, setTab] = useState('overview');
   const [showGuide, setShowGuide] = useState(false);
 
   // Guia na primeira visita ao painel.
@@ -48,7 +166,9 @@ export function AdminPage() {
       </div>
 
       <div className="flex flex-wrap gap-1.5 mb-6 border-b border-fm-border">
+        <TabBtn active={tab === 'overview'} onClick={() => setTab('overview')} icon={LayoutDashboard}>Visão geral</TabBtn>
         <TabBtn active={tab === 'users'} onClick={() => setTab('users')} icon={Users}>Utilizadores</TabBtn>
+        <TabBtn active={tab === 'billing'} onClick={() => setTab('billing')} icon={Wallet}>Faturação</TabBtn>
         <TabBtn active={tab === 'import'} onClick={() => setTab('import')} icon={Upload}>Importar inscritos</TabBtn>
         <TabBtn active={tab === 'waitlist'} onClick={() => setTab('waitlist')} icon={ListChecks}>Lista de espera</TabBtn>
         <TabBtn active={tab === 'audit'} onClick={() => setTab('audit')} icon={ScrollText}>Registo</TabBtn>
@@ -59,6 +179,8 @@ export function AdminPage() {
         <div className="bg-fm-danger/10 text-fm-danger text-sm rounded-lg px-4 py-3 mb-4">{admin.error}</div>
       )}
 
+      {tab === 'overview' && <DashboardTab admin={admin} />}
+      {tab === 'billing' && <BillingTab admin={admin} />}
       {tab === 'users' && <UsersTab admin={admin} />}
       {tab === 'import' && <ImportTab admin={admin} />}
       {tab === 'waitlist' && <WaitlistTab admin={admin} />}
@@ -118,23 +240,53 @@ function UsersTab({ admin }) {
   const [filter, setFilter] = useState('all');
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [sort, setSort] = useState({ key: 'created', dir: 'desc' });
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => { admin.loadUsers(); /* eslint-disable-next-line */ }, []);
 
-  const reload = () => { admin.loadUsers(search.trim() || null); admin.loadStats(); };
+  const reload = () => { admin.loadUsers(); admin.loadStats(); setSelectedIds(new Set()); };
 
-  function onSearch(e) { e.preventDefault(); admin.loadUsers(search.trim() || null); }
+  function toggleSort(key) {
+    setSort((s) => s.key === key
+      ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+      : { key, dir: (key === 'user' || key === 'state') ? 'asc' : 'desc' });
+  }
 
+  // Pesquisa em tempo real (filtro do lado do cliente sobre a lista carregada)
+  const q = norm(search.trim());
   const filtered = admin.users.filter((u) => {
+    if (q && !norm(`${u.email} ${u.full_name || ''}`).includes(q)) return false;
     if (filter === 'all') return true;
     const st = u.access?.state || 'none';
     if (filter === 'with_access') return u.access?.has_access;
     return st === filter;
   });
 
+  const displayed = [...filtered].sort((a, b) => {
+    const va = sortValue(a, sort.key), vb = sortValue(b, sort.key);
+    const c = typeof va === 'string' ? va.localeCompare(vb, 'pt') : (va - vb);
+    return sort.dir === 'asc' ? c : -c;
+  });
+
+  // Seleção em massa
+  const allOnPage = displayed.length > 0 && displayed.every((u) => selectedIds.has(u.id));
+  const someOnPage = displayed.some((u) => selectedIds.has(u.id));
+  function toggleOne(id) {
+    setSelectedIds((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function toggleAll() {
+    setSelectedIds((p) => {
+      const n = new Set(p);
+      if (allOnPage) displayed.forEach((u) => n.delete(u.id));
+      else displayed.forEach((u) => n.add(u.id));
+      return n;
+    });
+  }
+
   function exportCsv() {
     const header = 'email,nome,estado,segmento,acesso_ate,inscrito\n';
-    const body = filtered.map((u) =>
+    const body = displayed.map((u) =>
       [u.email, (u.full_name || '').replace(/,/g, ' '), u.access?.state || '', u.cohort || '',
        u.access?.effective_end || u.trial_ends_at || u.access_until || '', u.created_at]
         .join(',')).join('\n');
@@ -147,14 +299,16 @@ function UsersTab({ admin }) {
     <div>
       <StatsBar admin={admin} />
 
-      <form onSubmit={onSearch} className="flex gap-2 mb-3">
+      <div className="flex gap-2 mb-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-2.5 text-fm-text-mute" size={16} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar por email ou nome…" className="input pl-9" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar por email ou nome…" className="input pl-9 pr-9" />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-2.5 text-fm-text-mute hover:text-fm-green-dark" title="Limpar pesquisa"><X size={16} /></button>
+          )}
         </div>
-        <button type="submit" className="btn btn-dark">Procurar</button>
-        <button type="button" onClick={reload} className="btn btn-ghost" title="Recarregar"><RefreshCw size={16} /></button>
-      </form>
+        <button type="button" onClick={reload} className="btn btn-ghost" title="Recarregar do servidor"><RefreshCw size={16} /></button>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="flex flex-wrap gap-1.5">
@@ -170,31 +324,48 @@ function UsersTab({ admin }) {
         </div>
         <div className="flex-1" />
         <button onClick={() => setShowAdd(true)} className="btn btn-primary text-sm"><UserPlus size={15} /> Adicionar utilizador</button>
-        <button onClick={exportCsv} disabled={!filtered.length} className="btn btn-ghost text-sm disabled:opacity-50"><Download size={15} /> Exportar</button>
+        <button onClick={exportCsv} disabled={!displayed.length} className="btn btn-ghost text-sm disabled:opacity-50"><Download size={15} /> Exportar</button>
       </div>
 
+      <StateLegend />
+
       <MassTools admin={admin} onDone={reload} />
+
+      {selectedIds.size > 0 && (
+        <BulkBar
+          ids={[...selectedIds]}
+          admin={admin}
+          onApplied={() => { setSelectedIds(new Set()); admin.loadUsers(); admin.loadStats(); }}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      )}
 
       <div className="bg-fm-paper border border-fm-border rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-fm-ivory text-fm-text-mute text-xs uppercase tracking-wide">
               <tr>
-                <th className="text-left font-semibold px-4 py-3">Utilizador</th>
-                <th className="text-left font-semibold px-4 py-3">Estado</th>
-                <th className="text-left font-semibold px-4 py-3 hidden sm:table-cell">Acesso até</th>
-                <th className="text-left font-semibold px-4 py-3 hidden md:table-cell">Inscrito</th>
+                <th className="px-4 py-3 w-10"><CheckAll checked={allOnPage} indeterminate={someOnPage} onChange={toggleAll} /></th>
+                <SortHeader label="Utilizador" k="user" sort={sort} onSort={toggleSort} className="text-left px-4 py-3" />
+                <SortHeader label="Estado" k="state" sort={sort} onSort={toggleSort} className="text-left px-4 py-3" />
+                <SortHeader label="Sims" k="sims" sort={sort} onSort={toggleSort} className="text-left px-4 py-3 hidden sm:table-cell" />
+                <SortHeader label="Acesso até" k="until" sort={sort} onSort={toggleSort} className="text-left px-4 py-3 hidden md:table-cell" />
+                <SortHeader label="Último acesso" k="last" sort={sort} onSort={toggleSort} className="text-left px-4 py-3 hidden lg:table-cell" />
+                <SortHeader label="Inscrito" k="created" sort={sort} onSort={toggleSort} className="text-left px-4 py-3 hidden lg:table-cell" />
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              {admin.loading && <tr><td colSpan={5} className="px-4 py-8 text-center text-fm-text-mute">A carregar…</td></tr>}
-              {!admin.loading && filtered.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-fm-text-mute">Sem resultados.</td></tr>}
-              {filtered.map((u) => {
+              {admin.loading && <tr><td colSpan={8} className="px-4 py-8 text-center text-fm-text-mute">A carregar…</td></tr>}
+              {!admin.loading && displayed.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-fm-text-mute">Sem resultados.</td></tr>}
+              {displayed.map((u) => {
                 const st = u.access?.state || 'none';
                 const lbl = STATE_LABEL[st] || STATE_LABEL.none;
                 return (
-                  <tr key={u.id} className="border-t border-fm-border hover:bg-fm-ivory/50">
+                  <tr key={u.id} className={`border-t border-fm-border hover:bg-fm-ivory/50 ${selectedIds.has(u.id) ? 'bg-fm-yellow/10' : ''}`}>
+                    <td className="px-4 py-3">
+                      <input type="checkbox" checked={selectedIds.has(u.id)} onChange={() => toggleOne(u.id)} className="w-4 h-4 accent-fm-green cursor-pointer align-middle" />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-semibold text-fm-green-dark">{u.full_name || '—'}</div>
                       <div className="text-fm-text-mute text-xs">{u.email}</div>
@@ -203,8 +374,10 @@ function UsersTab({ admin }) {
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${lbl.c}`}>{lbl.t}</span>
                       {u.is_admin && st !== 'admin' && <Crown size={12} className="inline ml-1 text-fm-yellow-dark" />}
                     </td>
-                    <td className="px-4 py-3 hidden sm:table-cell text-fm-text-soft">{fmtDate(u.access?.effective_end || u.trial_ends_at || u.access_until)}</td>
-                    <td className="px-4 py-3 hidden md:table-cell text-fm-text-soft">{fmtDate(u.created_at)}</td>
+                    <td className="px-4 py-3 hidden sm:table-cell text-fm-text-soft tabular-nums">{u.simulations_count ?? 0}</td>
+                    <td className="px-4 py-3 hidden md:table-cell text-fm-text-soft">{fmtDate(u.access?.effective_end || u.trial_ends_at || u.access_until)}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-fm-text-soft">{fmtDateTime(u.last_sign_in_at)}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-fm-text-soft">{fmtDate(u.created_at)}</td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => setSelected(u)} className="text-fm-green font-semibold hover:underline text-xs">Gerir</button>
                     </td>
@@ -352,7 +525,12 @@ function AddUserModal({ admin, onClose, onDone }) {
 
         {msg && <div className={`text-sm mt-3 ${msg.startsWith('Erro') || msg.includes('inválido') ? 'text-fm-danger' : 'text-fm-success'}`}>{msg}</div>}
 
-        <div className="flex gap-2 mt-5">
+        <p className="help mt-3 flex items-start gap-1.5">
+          <Mail size={13} className="mt-0.5 flex-shrink-0" />
+          Envia um email ao utilizador: recebe as boas-vindas no primeiro acesso (se os emails automáticos estiverem ativos).
+        </p>
+
+        <div className="flex gap-2 mt-4">
           <button onClick={submit} disabled={busy} className="btn btn-primary flex-1 justify-center disabled:opacity-50">{busy ? 'A guardar…' : 'Adicionar'}</button>
           <button onClick={onClose} className="btn btn-ghost">Fechar</button>
         </div>
@@ -405,6 +583,10 @@ function UserDrawer({ user, admin, onClose, onChanged }) {
           <button disabled={busy} onClick={() => act(() => admin.setTrial(user.id, new Date().toISOString()))} className="btn btn-ghost w-full justify-center mt-2 text-sm disabled:opacity-50">
             <Clock size={14} /> Terminar acesso agora
           </button>
+          <p className="help mt-2">
+            <strong>Suspender</strong>: bloqueia já, mesmo quem pagou — reversível.
+            <strong> Terminar</strong>: encerra o trial; quem pagou mantém o acesso.
+          </p>
         </Section>
 
         <Section title="Marcar como pago (acesso direto)">
@@ -428,6 +610,10 @@ function UserDrawer({ user, admin, onClose, onChanged }) {
             <input type="date" value={trialDate} onChange={(e) => setTrialDate(e.target.value)} className="input flex-1" />
             <button disabled={busy || !trialDate} onClick={() => act(() => admin.setTrial(user.id, new Date(trialDate + 'T23:59:59').toISOString()))} className="btn btn-dark justify-center disabled:opacity-50"><Clock size={15} /> Guardar</button>
           </div>
+          <p className="help mt-2 flex items-start gap-1.5">
+            <Mail size={13} className="mt-0.5 flex-shrink-0" />
+            Perto do fim do trial, a pessoa pode receber um email automático de aviso (se ativo).
+          </p>
         </Section>
 
         <Section title="Permissões">
@@ -509,6 +695,10 @@ function ImportTab({ admin }) {
           Carrega um ficheiro <strong>CSV</strong> ou <strong>Excel</strong> exportado do Go High Level.
           Colunas reconhecidas: <code>email</code> (obrigatória), <code>nome</code>, <code>plano</code>, <code>trial_start</code> (opcional).
           Quem já tiver conta é reativado automaticamente.
+        </p>
+        <p className="help mb-4 flex items-start gap-1.5">
+          <Mail size={13} className="mt-0.5 flex-shrink-0" />
+          Envia emails: cada inscrito recebe um email de boas-vindas quando entra pela primeira vez (se os emails automáticos estiverem ativos).
         </p>
         <div className="mb-3">
           <label className="label">Segmento (cohort)</label>
@@ -700,6 +890,168 @@ function SettingsTab({ admin }) {
         <button onClick={save} disabled={busy} className="btn btn-primary disabled:opacity-50">{busy ? 'A guardar…' : 'Guardar definições'}</button>
         {msg && <span className={`text-sm ${msg.startsWith('Erro') ? 'text-fm-danger' : 'text-fm-success'}`}><Check size={14} className="inline" /> {msg}</span>}
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Componentes de dashboard
+// ============================================================
+function StatCard({ label, value, sub, icon: Icon, accent }) {
+  return (
+    <div className="bg-fm-paper border border-fm-border rounded-xl p-4 fm-lift">
+      <div className="flex items-center gap-1.5 text-fm-text-mute text-[11px] uppercase tracking-wide mb-1">
+        {Icon && <Icon size={13} />} {label}
+      </div>
+      <div className={`font-display font-bold text-2xl ${accent || 'text-fm-green-dark'}`}>{value}</div>
+      {sub && <div className="text-xs text-fm-text-mute mt-0.5">{sub}</div>}
+    </div>
+  );
+}
+
+function MiniBars({ data, valueKey, labelKey, color = 'bg-fm-green' }) {
+  const vals = (data || []).map((d) => Number(d[valueKey]) || 0);
+  const max = Math.max(1, ...vals);
+  return (
+    <div className="flex items-end gap-1.5 h-32">
+      {(data || []).map((d, i) => {
+        const v = Number(d[valueKey]) || 0;
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group" title={`${d[labelKey]}: ${v}`}>
+            <div className="text-[10px] font-semibold text-fm-green-dark mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity">{v}</div>
+            <div className={`w-full ${color} rounded-t transition-all`} style={{ height: `${v > 0 ? Math.max(6, (v / max) * 100) : 0}%` }} />
+            <div className="text-[9px] text-fm-text-mute mt-1 truncate w-full text-center">{d[labelKey]}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================================
+// TAB: VISÃO GERAL (utilização)
+// ============================================================
+function DashboardTab({ admin }) {
+  useEffect(() => { admin.loadStats(); admin.loadUsage(); /* eslint-disable-next-line */ }, []);
+  const s = admin.stats, u = admin.usage;
+  if (!s || !u) return <div className="text-fm-text-mute text-sm py-12 text-center">A carregar…</div>;
+
+  const scenName = { hpp: 'HPP c/ reinvest.', geral: 'Caso geral', pre1989: 'Pré-1989', estado: 'Venda ao Estado' };
+  const scen = Object.entries(u.by_scenario || {}).map(([k, v]) => ({ k, v: Number(v) || 0 })).sort((a, b) => b.v - a.v);
+  const scenMax = Math.max(1, ...scen.map((x) => x.v));
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard label="Utilizadores" value={u.total_users} icon={Users} />
+        <StatCard label="Com acesso" value={s.with_access} accent="text-fm-green" icon={Crown} />
+        <StatCard label="Em trial" value={s.trial} />
+        <StatCard label="Ativos (7d)" value={u.active_7d} sub={`${u.active_30d} em 30 dias`} icon={TrendingUp} />
+        <StatCard label="Simulações" value={u.total_sims} sub={`${u.sims_7d} esta semana`} />
+        <StatCard label="Suspensos" value={s.suspended} accent="text-fm-danger" />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-fm-paper border border-fm-border rounded-xl p-5">
+          <h3 className="font-bold text-fm-green-dark text-sm mb-4">Inscrições — últimos 14 dias</h3>
+          <MiniBars data={u.series} valueKey="signups" labelKey="d" color="bg-fm-green" />
+        </div>
+        <div className="bg-fm-paper border border-fm-border rounded-xl p-5">
+          <h3 className="font-bold text-fm-green-dark text-sm mb-4">Simulações — últimos 14 dias</h3>
+          <MiniBars data={u.series} valueKey="sims" labelKey="d" color="bg-fm-yellow" />
+        </div>
+      </div>
+
+      <div className="bg-fm-paper border border-fm-border rounded-xl p-5">
+        <h3 className="font-bold text-fm-green-dark text-sm mb-4">Simulações por cenário</h3>
+        {scen.length === 0 ? (
+          <p className="text-fm-text-mute text-sm">Sem simulações ainda.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {scen.map(({ k, v }) => (
+              <div key={k} className="flex items-center gap-3">
+                <div className="w-32 text-sm text-fm-text-soft">{scenName[k] || k}</div>
+                <div className="flex-1 bg-fm-ivory rounded-full h-3 overflow-hidden">
+                  <div className="h-full bg-fm-green rounded-full transition-all" style={{ width: `${(v / scenMax) * 100}%` }} />
+                </div>
+                <div className="w-10 text-right text-sm font-semibold tabular-nums">{v}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TAB: FATURAÇÃO
+// ============================================================
+function BillingTab({ admin }) {
+  useEffect(() => { admin.loadBilling(); /* eslint-disable-next-line */ }, []);
+  const b = admin.billing;
+  if (!b) return <div className="text-fm-text-mute text-sm py-12 text-center">A carregar…</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard label="Receita total" value={eur(b.total_revenue)} icon={Wallet} accent="text-fm-green" />
+        <StatCard label="Compras" value={b.paid_count} sub={`${b.count_30d} nos últimos 30 dias`} icon={FileText} />
+        <StatCard label="Receita 30 dias" value={eur(b.revenue_30d)} icon={TrendingUp} />
+        <StatCard label="Subscrições ativas" value={b.active_subs} />
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="bg-fm-paper border border-fm-border rounded-xl p-5 lg:col-span-2">
+          <h3 className="font-bold text-fm-green-dark text-sm mb-4">Receita por mês (últimos 6)</h3>
+          <MiniBars data={b.by_month} valueKey="revenue" labelKey="m" color="bg-fm-green" />
+        </div>
+        <div className="bg-fm-paper border border-fm-border rounded-xl p-5">
+          <h3 className="font-bold text-fm-green-dark text-sm mb-4">Por plano</h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-fm-text-soft">6 meses · 65 €</span>
+              <span className="font-semibold tabular-nums">{b.count_6m} · {eur(b.rev_6m)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-fm-text-soft">Anual · 100 €</span>
+              <span className="font-semibold tabular-nums">{b.count_12m} · {eur(b.rev_12m)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-fm-paper border border-fm-border rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-fm-border font-bold text-fm-green-dark text-sm">Pagamentos recentes</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-fm-ivory text-fm-text-mute text-xs uppercase">
+              <tr>
+                <th className="text-left px-4 py-2.5">Cliente</th>
+                <th className="text-left px-4 py-2.5">Valor</th>
+                <th className="text-left px-4 py-2.5">Data</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(!b.recent || b.recent.length === 0) && <tr><td colSpan={3} className="px-4 py-8 text-center text-fm-text-mute">Ainda sem pagamentos.</td></tr>}
+              {(b.recent || []).map((p, i) => (
+                <tr key={i} className="border-t border-fm-border">
+                  <td className="px-4 py-2.5">
+                    <div className="font-semibold text-fm-green-dark">{p.name || '—'}</div>
+                    <div className="text-fm-text-mute text-xs">{p.email}</div>
+                  </td>
+                  <td className="px-4 py-2.5 font-semibold tabular-nums">{eur(p.amount)}</td>
+                  <td className="px-4 py-2.5 text-fm-text-soft">{fmtDate(p.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p className="text-xs text-fm-text-mute">
+        Os pagamentos aparecem aqui assim que o Stripe estiver ligado (ver PAGAMENTOS.md). Em modo de teste, os pagamentos de teste também surgem.
+      </p>
     </div>
   );
 }

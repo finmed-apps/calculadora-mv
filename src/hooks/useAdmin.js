@@ -10,6 +10,8 @@ export function useAdmin() {
   const [allowed, setAllowed] = useState([]);
   const [stats, setStats] = useState(null);
   const [audit, setAudit] = useState([]);
+  const [usage, setUsage] = useState(null);
+  const [billing, setBilling] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -22,7 +24,8 @@ export function useAdmin() {
   const loadUsers = useCallback(async (search = null) => {
     setLoading(true); setError('');
     try {
-      const data = await wrap(supabase.rpc('admin_list_users', { p_search: search || null }));
+      // Carrega a lista completa (até 2000) para a pesquisa filtrar em tempo real no cliente.
+      const data = await wrap(supabase.rpc('admin_list_users', { p_search: search || null, p_limit: 2000 }));
       setUsers(data || []);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
@@ -40,6 +43,16 @@ export function useAdmin() {
 
   const loadAudit = useCallback(async () => {
     try { setAudit(await wrap(supabase.rpc('admin_list_audit', { p_limit: 300 })) || []); }
+    catch (e) { setError(e.message); }
+  }, []);
+
+  const loadUsage = useCallback(async () => {
+    try { setUsage(await wrap(supabase.rpc('admin_usage'))); }
+    catch (e) { setError(e.message); }
+  }, []);
+
+  const loadBilling = useCallback(async () => {
+    try { setBilling(await wrap(supabase.rpc('admin_billing'))); }
     catch (e) { setError(e.message); }
   }, []);
 
@@ -89,6 +102,18 @@ export function useAdmin() {
   const deleteUser = (userId) =>
     wrap(supabase.rpc('admin_delete_user', { p_user: userId }));
 
+  // --- Ações em massa sobre utilizadores selecionados à mão ---
+  const bulkSetSuspended = (ids, val) =>
+    wrap(supabase.rpc('admin_bulk_set_suspended', { p_ids: ids, p_suspended: val }));
+  const bulkGrantDays = (ids, days) =>
+    wrap(supabase.rpc('admin_bulk_grant_days', { p_ids: ids, p_days: days }));
+  const bulkSetTrial = (ids, endsISO) =>
+    wrap(supabase.rpc('admin_bulk_set_trial', { p_ids: ids, p_ends: endsISO }));
+  const bulkSetAllowed = (ids, val) =>
+    wrap(supabase.rpc('admin_bulk_set_allowed', { p_ids: ids, p_allowed: val }));
+  const bulkDelete = (ids) =>
+    wrap(supabase.rpc('admin_bulk_delete', { p_ids: ids }));
+
   const importAllowed = (rows, cohort) =>
     wrap(supabase.rpc('admin_import_allowed', { p_rows: rows, p_cohort: cohort }));
 
@@ -103,11 +128,12 @@ export function useAdmin() {
   };
 
   return {
-    users, config, waitlist, allowed, stats, audit, loading, error,
-    loadUsers, loadConfig, loadWaitlist, loadAllowed, loadStats, loadAudit,
+    users, config, waitlist, allowed, stats, audit, usage, billing, loading, error,
+    loadUsers, loadConfig, loadWaitlist, loadAllowed, loadStats, loadAudit, loadUsage, loadBilling,
     setSuspended, grantDays, setTrial, setAdmin, setAllowedFlag,
     massLock, massUnlock, massGrantDays, massSetTrial,
     addOrGrant, deleteUser, importAllowed, saveConfig,
+    bulkSetSuspended, bulkGrantDays, bulkSetTrial, bulkSetAllowed, bulkDelete,
   };
 }
 
