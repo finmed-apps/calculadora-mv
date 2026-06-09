@@ -26,29 +26,32 @@ export default function App() {
     <div className="min-h-screen flex flex-col">
       {showStandardHeader && <Header />}
       {showStandardHeader && <TrialBanner />}
-      <Routes>
-        {/* PUBLIC */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
+      {/* Fade/rise suave a cada mudança de página (re-corre porque a key muda). */}
+      <div key={location.pathname} className="fm-page flex-1 flex flex-col">
+        <Routes>
+          {/* PUBLIC */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
 
-        {/* APP (protegido + gate de acesso) */}
-        <Route path="/app" element={<RequireAuth><AccessGate><CalculatorPage /></AccessGate></RequireAuth>} />
-        <Route path="/app/historico" element={<RequireAuth><AccessGate><HistoryPage /></AccessGate></RequireAuth>} />
-        {/* Conta e Upgrade são sempre acessíveis a quem está autenticado e na lista,
-            mesmo com trial expirado (allowUpgrade) — senão não conseguiriam comprar. */}
-        <Route path="/app/conta" element={<RequireAuth><AccessGate allowUpgrade><AccountPage /></AccessGate></RequireAuth>} />
-        <Route path="/app/upgrade" element={<RequireAuth><AccessGate allowUpgrade><UpgradePage /></AccessGate></RequireAuth>} />
+          {/* APP (protegido + gate de acesso) */}
+          <Route path="/app" element={<RequireAuth><AccessGate><CalculatorPage /></AccessGate></RequireAuth>} />
+          <Route path="/app/historico" element={<RequireAuth><AccessGate><HistoryPage /></AccessGate></RequireAuth>} />
+          {/* Conta e Upgrade são sempre acessíveis a quem está autenticado e na lista,
+              mesmo com trial expirado (allowUpgrade) — senão não conseguiriam comprar. */}
+          <Route path="/app/conta" element={<RequireAuth><AccessGate allowUpgrade><AccountPage /></AccessGate></RequireAuth>} />
+          <Route path="/app/upgrade" element={<RequireAuth><AccessGate allowUpgrade><UpgradePage /></AccessGate></RequireAuth>} />
 
-        {/* ADMIN */}
-        <Route path="/app/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
+          {/* ADMIN */}
+          <Route path="/app/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
 
-        {/* Legacy redirects — quem tem links antigos não fica perdido */}
-        <Route path="/historico" element={<Navigate to="/app/historico" replace />} />
-        <Route path="/conta" element={<Navigate to="/app/conta" replace />} />
-        <Route path="/upgrade" element={<Navigate to="/app/upgrade" replace />} />
+          {/* Legacy redirects — quem tem links antigos não fica perdido */}
+          <Route path="/historico" element={<Navigate to="/app/historico" replace />} />
+          <Route path="/conta" element={<Navigate to="/app/conta" replace />} />
+          <Route path="/upgrade" element={<Navigate to="/app/upgrade" replace />} />
 
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
       {showStandardHeader && <Footer />}
     </div>
   );

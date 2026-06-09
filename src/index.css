@@ -5,6 +5,7 @@
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
   }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -28,7 +29,7 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-[14.5px] cursor-pointer border-2 border-transparent transition-all;
+    @apply inline-flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-[14.5px] cursor-pointer border-2 border-transparent;
   }
   .btn-primary {
     @apply bg-fm-yellow text-fm-green-dark border-fm-yellow hover:bg-fm-yellow-dark hover:border-fm-yellow-dark hover:-translate-y-px hover:shadow-fm-yellow;
@@ -40,7 +41,7 @@
     @apply bg-fm-green text-fm-paper border-fm-green hover:bg-fm-green-dark hover:border-fm-green-dark;
   }
   .input {
-    @apply w-full px-3.5 py-3 border-2 border-fm-border rounded-lg bg-fm-paper text-fm-text text-[15px] transition-all;
+    @apply w-full px-3.5 py-3 border-2 border-fm-border rounded-lg bg-fm-paper text-fm-text text-[15px];
     @apply focus:outline-none focus:border-fm-yellow focus:ring-2 focus:ring-fm-yellow/20;
     font-feature-settings: 'tnum';
   }
@@ -50,4 +51,84 @@
   .help {
     @apply text-[12.5px] text-fm-text-mute mt-1.5 leading-snug;
   }
+}
+
+/* ============================================================
+   Micro-interações e animações (estética premium)
+   Tudo em CSS, leve, e desativado para quem prefere menos movimento.
+   ============================================================ */
+
+/* --- Botões: transição suave, "press" ao clicar, brilho subtil --- */
+.btn {
+  transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease,
+              background-color .2s ease, border-color .2s ease, filter .2s ease;
+  will-change: transform;
+}
+.btn:active { transform: translateY(1px) scale(.985); }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(244,197,66,.38); }
+
+.btn-primary { position: relative; overflow: hidden; }
+.btn-primary:hover { filter: brightness(1.02); }
+.btn-primary::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 32%, rgba(255,255,255,.45) 50%, transparent 68%);
+  transform: translateX(-160%);
+}
+.btn-primary:hover::after { animation: fmSheen .8s ease; }
+
+.btn-dark:hover { box-shadow: 0 8px 22px rgba(20,45,32,.18); }
+
+/* --- Inputs: foco com leve brilho dourado --- */
+.input {
+  transition: border-color .18s ease, box-shadow .22s ease, background-color .2s ease;
+}
+.input:focus {
+  box-shadow: 0 0 0 3px rgba(244,197,66,.22), 0 4px 14px rgba(244,197,66,.12);
+}
+
+/* --- Keyframes --- */
+@keyframes fmRise   { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fmPop    { 0% { opacity: 0; transform: scale(.94); } 60% { opacity: 1; transform: scale(1.012); } 100% { transform: scale(1); } }
+@keyframes fmGlowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fmSheen  { from { transform: translateX(-160%); } to { transform: translateX(170%); } }
+
+/* --- Utilitários de entrada --- */
+.fm-page  { animation: fmRise .42s cubic-bezier(.2,.7,.2,1) both; }
+.fm-rise  { animation: fmRise .5s  cubic-bezier(.2,.7,.2,1) both; }
+.fm-pop   { animation: fmPop  .5s  cubic-bezier(.2,.7,.2,1) both; }
+
+/* Brilho subtil para os números de resultado (ouro sobre verde) */
+.fm-glow  {
+  text-shadow: 0 0 22px rgba(244,197,66,.42), 0 0 3px rgba(244,197,66,.30);
+  animation: fmGlowIn .7s cubic-bezier(.2,.7,.2,1) both;
+}
+
+/* Elevação no hover de cartões */
+.fm-lift  {
+  transition: transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease, border-color .2s ease;
+}
+.fm-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 34px rgba(20,45,32,.10);
+}
+
+/* Entrada em cascata dos filhos */
+.fm-stagger > * { animation: fmRise .5s cubic-bezier(.2,.7,.2,1) both; }
+.fm-stagger > *:nth-child(1) { animation-delay: .03s; }
+.fm-stagger > *:nth-child(2) { animation-delay: .07s; }
+.fm-stagger > *:nth-child(3) { animation-delay: .11s; }
+.fm-stagger > *:nth-child(4) { animation-delay: .15s; }
+.fm-stagger > *:nth-child(5) { animation-delay: .19s; }
+.fm-stagger > *:nth-child(6) { animation-delay: .23s; }
+.fm-stagger > *:nth-child(7) { animation-delay: .27s; }
+.fm-stagger > *:nth-child(8) { animation-delay: .31s; }
+.fm-stagger > *:nth-child(9) { animation-delay: .35s; }
+
+/* Respeitar preferência de menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .fm-page, .fm-rise, .fm-pop, .fm-glow,
+  .fm-stagger > *, .btn-primary::after { animation: none !important; }
+  .btn:active { transform: none; }
+  .fm-lift:hover { transform: none; }
 }

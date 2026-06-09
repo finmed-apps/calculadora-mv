@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Edit2, RefreshCw, Save, FileDown, MessageSquare } from 'lucide-react';
 import { formatEuro, formatPct } from '../lib/calc';
+import { AnimatedNumber } from './AnimatedNumber';
 
 export function Result({ result, onEdit, onReset, onSave, onExportPdf, saving, savedId, hasPaidAccess }) {
   const [label, setLabel] = useState('');
   const isHPP = result.inputs?.scenario === 'hpp';
 
   return (
-    <section className="bg-fm-paper rounded-2xl border border-fm-border shadow-fm p-8 sm:p-10">
+    <section className="bg-fm-paper rounded-2xl border border-fm-border shadow-fm p-8 sm:p-10 fm-rise">
       <span className="inline-block bg-fm-yellow text-fm-green-dark px-3 py-1 rounded-full text-[11px] font-bold tracking-widest uppercase mb-3">
         Passo 3 · Resultado
       </span>
@@ -19,8 +20,8 @@ export function Result({ result, onEdit, onReset, onSave, onExportPdf, saving, s
         <span className="inline-block bg-fm-yellow/20 text-fm-yellow px-3 py-1 rounded-full text-[11px] font-bold tracking-widest uppercase mb-4">
           IRS estimado sobre a mais-valia
         </span>
-        <div className="font-display font-bold text-fm-yellow leading-none mb-2" style={{ fontSize: 'clamp(48px, 8vw, 84px)' }}>
-          {formatEuro(result.irsIsolado)}
+        <div className="font-display font-bold text-fm-yellow leading-none mb-2 fm-glow" style={{ fontSize: 'clamp(48px, 8vw, 84px)' }}>
+          <AnimatedNumber value={result.irsIsolado} format={(n) => formatEuro(Math.round(n))} />
         </div>
         <p className="text-[15px] text-white/80 max-w-xl">
           {result.maisValia < 0
@@ -30,7 +31,7 @@ export function Result({ result, onEdit, onReset, onSave, onExportPdf, saving, s
               : 'Este valor é o IRS isolado sobre a mais-valia deste imóvel. O imposto real é apurado pelo englobamento com os restantes rendimentos do agregado.'}
         </p>
 
-        <div className="grid grid-cols-3 gap-6 mt-7 pt-5 border-t border-white/10">
+        <div className="grid grid-cols-3 gap-6 mt-7 pt-5 border-t border-white/10 fm-stagger">
           <Meta lbl="Mais-valia bruta" val={formatEuro(result.maisValia)} />
           <Meta lbl="Tributável final" val={formatEuro(result.tributavelFinal)} />
           <Meta lbl="Taxa efetiva" val={result.tributavelFinal > 0 ? formatPct(result.taxaEfetiva) : '—'} />
@@ -38,7 +39,7 @@ export function Result({ result, onEdit, onReset, onSave, onExportPdf, saving, s
       </div>
 
       {/* BREAKDOWN */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5 fm-stagger">
         <Metric label="Valor de venda" value={formatEuro(result.inputs?.valorVenda)} />
         <Metric label="Valor de aquisição" value={formatEuro(result.valorCompraAtual)} />
         <Metric label="Despesas dedutíveis" value={formatEuro(result.totalDespesas)} />
@@ -122,7 +123,7 @@ function Meta({ lbl, val }) {
 function Metric({ label, value, note, positive, negative }) {
   const valColor = positive ? 'text-fm-success' : negative ? 'text-fm-danger' : 'text-fm-green-dark';
   return (
-    <div className="bg-fm-paper border border-fm-border rounded-lg p-5">
+    <div className="bg-fm-paper border border-fm-border rounded-lg p-5 fm-lift">
       <div className="text-[11px] uppercase tracking-widest font-bold text-fm-text-mute mb-1">{label}</div>
       <div className={`font-display text-2xl font-bold tabular-nums ${valColor}`}>{value}</div>
       {note && <div className="text-[12.5px] text-fm-text-mute mt-1 leading-snug">{note}</div>}

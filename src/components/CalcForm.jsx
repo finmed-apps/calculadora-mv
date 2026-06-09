@@ -74,7 +74,7 @@ export function CalcForm({ scenario, prefill, onCancel, onCalculate }) {
   }
 
   return (
-    <section className="bg-fm-paper rounded-2xl border border-fm-border shadow-fm p-8 sm:p-10">
+    <section className="bg-fm-paper rounded-2xl border border-fm-border shadow-fm p-8 sm:p-10 fm-rise">
       <span className="inline-block bg-fm-yellow text-fm-green-dark px-3 py-1 rounded-full text-[11px] font-bold tracking-widest uppercase mb-3">
         Passo 2 · Dados
       </span>
@@ -92,7 +92,7 @@ export function CalcForm({ scenario, prefill, onCancel, onCalculate }) {
         sub="Datas e valores da escritura."
         state={phase === 'A' ? 'active' : 'completed'}
       >
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4 fm-stagger">
           <Field label="Data de aquisição *" type="date" value={data.dataCompra} onChange={(v) => setField('dataCompra', v)} />
           <Field label="Data de venda *" type="date" value={data.dataVenda} onChange={(v) => setField('dataVenda', v)} />
           <Field label="Valor de aquisição *" type="number" suffix="€" placeholder="120 000" value={data.valorCompra} onChange={(v) => setField('valorCompra', v)} help="Valor constante na escritura de compra." />

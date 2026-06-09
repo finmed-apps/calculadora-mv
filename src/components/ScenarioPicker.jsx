@@ -40,17 +40,17 @@ export function ScenarioPicker({ onPick }) {
         Antes de calcular, vamos perceber se a venda pode estar isenta de IRS. Escolha o cenário que melhor descreve o caso.
       </p>
 
-      <div className="grid sm:grid-cols-2 gap-3">
+      <div className="grid sm:grid-cols-2 gap-3 fm-stagger">
         {SCENARIOS.map((s) => {
           const Icon = s.icon;
           return (
             <button
               key={s.id}
               onClick={() => onPick(s.id)}
-              className="group text-left bg-fm-ivory border-2 border-fm-border rounded-xl p-5 hover:border-fm-yellow hover:-translate-y-0.5 hover:shadow-fm transition-all relative overflow-hidden"
+              className="group text-left bg-fm-ivory border-2 border-fm-border rounded-xl p-5 hover:border-fm-yellow hover:-translate-y-1 hover:shadow-fm transition-all duration-200 relative overflow-hidden"
             >
               <div className="absolute top-0 left-0 w-1 h-full bg-fm-yellow opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="w-10 h-10 bg-fm-yellow rounded-lg flex items-center justify-center mb-3 text-fm-green-dark">
+              <div className="w-10 h-10 bg-fm-yellow rounded-lg flex items-center justify-center mb-3 text-fm-green-dark transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-3">
                 <Icon size={20} />
               </div>
               <h3 className="font-bold text-fm-green-dark mb-1">{s.title}</h3>
