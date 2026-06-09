@@ -124,11 +124,25 @@
 .fm-stagger > *:nth-child(8) { animation-delay: .31s; }
 .fm-stagger > *:nth-child(9) { animation-delay: .35s; }
 
+/* --- Overlay "a calcular" --- */
+@keyframes fmPulseRing { 0% { transform: scale(.55); opacity: .65; } 80% { opacity: 0; } 100% { transform: scale(1.5); opacity: 0; } }
+@keyframes fmProgress  { from { width: 0; } to { width: 100%; } }
+@keyframes fmTick      { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+.fm-ring {
+  position: absolute; inset: 0; border-radius: 9999px;
+  border: 2px solid rgba(244,197,66,.6);
+  animation: fmPulseRing 1.5s cubic-bezier(.2,.7,.2,1) infinite;
+}
+.fm-progress { width: 0; animation: fmProgress 1.25s ease-in-out forwards; }
+.fm-tick { animation: fmTick 1s ease-in-out infinite; }
+
 /* Respeitar preferência de menos movimento */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .fm-page, .fm-rise, .fm-pop, .fm-glow,
-  .fm-stagger > *, .btn-primary::after { animation: none !important; }
+  .fm-stagger > *, .btn-primary::after,
+  .fm-ring, .fm-progress, .fm-tick { animation: none !important; }
   .btn:active { transform: none; }
   .fm-lift:hover { transform: none; }
 }

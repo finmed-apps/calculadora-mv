@@ -14,6 +14,7 @@ import { useProfile } from '../hooks/useProfile';
 import { useSimulations, useSimulation } from '../hooks/useSimulations';
 import { useAccess } from '../hooks/useAccess';
 import { OnboardingModal, hasSeenOnboarding, markOnboardingSeen } from '../components/OnboardingModal';
+import { CalculatingOverlay } from '../components/CalculatingOverlay';
 
 export function CalculatorPage() {
   const { user } = useAuth();
@@ -43,6 +44,7 @@ export function CalculatorPage() {
   const [scenario, setScenario] = useState(null);
   const [prefill, setPrefill] = useState(null);
   const [result, setResult] = useState(null);
+  const [calculating, setCalculating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState(null);
 
@@ -64,14 +66,26 @@ export function CalculatorPage() {
     setPrefill(null);
     setResult(null);
     setSavedId(null);
+    setCalculating(false);
   }
 
   function handleCalculate(inputs) {
     try {
       const out = calcular(inputs);
-      setResult(out);
       setSavedId(null);  // novo cálculo, mesmo se vier de prefill
+      const reduce = typeof window !== 'undefined' && window.matchMedia
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+      if (reduce) {
+        setResult(out);
+        return;
+      }
+      // Mostra o efeito "a calcular" e só depois revela o resultado.
+      setCalculating(true);
+      setTimeout(() => {
+        setResult(out);
+        setCalculating(false);
+      }, 1300);
     } catch (err) {
       console.error('Calculation error:', err);
       alert('Erro no cálculo:\n\n' + err.message);
@@ -117,6 +131,7 @@ export function CalculatorPage() {
 
   function handleEdit() {
     // Carregar inputs da simulação para o form
+    setCalculating(false);
     if (result?.inputs) {
       setPrefill(result.inputs);
       setResult(null);
@@ -131,28 +146,29 @@ export function CalculatorPage() {
     setPrefill(null);
     setResult(null);
     setSavedId(null);
+    setCalculating(false);
   }
 
   // --- RENDER ---
   return (
     <main className="max-w-6xl mx-auto px-5 py-8 sm:py-12 space-y-5">
       <OnboardingModal open={showOnboarding} onClose={closeOnboarding} />
-      {!result && <Hero />}
+      {!result && !calculating && <Hero />}
 
       {/* Histórico recente — só na home, com user logado e >0 simulações */}
-      {user && !scenario && !result && recent.length > 0 && (
+      {user && !scenario && !result && !calculating && recent.length > 0 && (
         <RecentSimulations items={recent} />
       )}
 
-      {!scenario && !result && <ScenarioPicker onPick={handlePick} />}
+      {!scenario && !result && !calculating && <ScenarioPicker onPick={handlePick} />}
 
       {/* Cenários informativos (não passam por cálculo) */}
-      {scenario && !result && (scenario === 'pre1989' || scenario === 'estado') && (
+      {scenario && !result && !calculating && (scenario === 'pre1989' || scenario === 'estado') && (
         <InfoScreen scenario={scenario} onBack={handleReset} />
       )}
 
       {/* Cenários com cálculo */}
-      {scenario && !result && (scenario === 'hpp' || scenario === 'geral') && (
+      {scenario && !result && !calculating && (scenario === 'hpp' || scenario === 'geral') && (
         <CalcForm
           scenario={scenario}
           prefill={prefill}
@@ -160,6 +176,9 @@ export function CalculatorPage() {
           onCalculate={handleCalculate}
         />
       )}
+
+      {/* Efeito "a calcular" antes de revelar o resultado */}
+      {calculating && <CalculatingOverlay />}
 
       {result && (
         <>
