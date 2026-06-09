@@ -3,7 +3,7 @@ import {
   Users, Search, Shield, Lock, Unlock, Clock, Plus, Upload,
   Settings, ListChecks, RefreshCw, X, Crown, Ban, Check,
   UserPlus, Trash2, Download, CalendarClock, ScrollText, HelpCircle,
-  ArrowUp, ArrowDown, ArrowUpDown, Mail, LayoutDashboard, Wallet, TrendingUp, FileText,
+  ArrowUp, ArrowDown, ArrowUpDown, Mail, LayoutDashboard, Wallet, TrendingUp, FileText, UserCheck,
 } from 'lucide-react';
 import { useAdmin, parseEnrolleesFile } from '../hooks/useAdmin';
 import { AdminGuide, hasSeenAdminGuide, markAdminGuideSeen } from '../components/AdminGuide';
@@ -170,6 +170,7 @@ export function AdminPage() {
         <TabBtn active={tab === 'users'} onClick={() => setTab('users')} icon={Users}>Utilizadores</TabBtn>
         <TabBtn active={tab === 'billing'} onClick={() => setTab('billing')} icon={Wallet}>Faturação</TabBtn>
         <TabBtn active={tab === 'import'} onClick={() => setTab('import')} icon={Upload}>Importar inscritos</TabBtn>
+        <TabBtn active={tab === 'allowlist'} onClick={() => setTab('allowlist')} icon={UserCheck}>Adicionados</TabBtn>
         <TabBtn active={tab === 'waitlist'} onClick={() => setTab('waitlist')} icon={ListChecks}>Lista de espera</TabBtn>
         <TabBtn active={tab === 'audit'} onClick={() => setTab('audit')} icon={ScrollText}>Registo</TabBtn>
         <TabBtn active={tab === 'settings'} onClick={() => setTab('settings')} icon={Settings}>Definições</TabBtn>
@@ -183,6 +184,7 @@ export function AdminPage() {
       {tab === 'billing' && <BillingTab admin={admin} />}
       {tab === 'users' && <UsersTab admin={admin} />}
       {tab === 'import' && <ImportTab admin={admin} />}
+      {tab === 'allowlist' && <AllowlistTab admin={admin} />}
       {tab === 'waitlist' && <WaitlistTab admin={admin} />}
       {tab === 'audit' && <AuditTab admin={admin} />}
       {tab === 'settings' && <SettingsTab admin={admin} />}
@@ -469,8 +471,8 @@ function AddUserModal({ admin, onClose, onDone }) {
     try {
       const res = await admin.addOrGrant(email, name, mode === 'grant' ? days : null, cohort);
       setMsg(res?.existed
-        ? 'Feito — a conta já existia e o acesso foi aplicado.'
-        : 'Feito — adicionado à lista. Recebe acesso assim que entrar pela primeira vez.');
+        ? 'Acesso aplicado a uma conta que já existia. (Não enviámos convite.)'
+        : 'Adicionado e convite enviado por email (se os emails automáticos estiverem ativos). Senão, avisa a pessoa para entrar em calc.finmed.pt/login.');
       setEmail(''); setName('');
       onDone();
     } catch (e) { setMsg('Erro: ' + e.message); }
@@ -527,7 +529,7 @@ function AddUserModal({ admin, onClose, onDone }) {
 
         <p className="help mt-3 flex items-start gap-1.5">
           <Mail size={13} className="mt-0.5 flex-shrink-0" />
-          Envia um email ao utilizador: recebe as boas-vindas no primeiro acesso (se os emails automáticos estiverem ativos).
+          Envia um convite por email com o link para entrar (se os emails automáticos estiverem ativos). Caso contrário, avisa a pessoa para entrar em <strong>calc.finmed.pt/login</strong> com este email.
         </p>
 
         <div className="flex gap-2 mt-4">
@@ -889,6 +891,138 @@ function SettingsTab({ admin }) {
       <div className="flex items-center gap-3 pt-2">
         <button onClick={save} disabled={busy} className="btn btn-primary disabled:opacity-50">{busy ? 'A guardar…' : 'Guardar definições'}</button>
         {msg && <span className={`text-sm ${msg.startsWith('Erro') ? 'text-fm-danger' : 'text-fm-success'}`}><Check size={14} className="inline" /> {msg}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TAB: ADICIONADOS (allowlist)
+// ============================================================
+function AllowlistTab({ admin }) {
+  const [search, setSearch] = useState('');
+  const [reg, setReg] = useState('all'); // all | registered | pending
+  const [sort, setSort] = useState({ key: 'created', dir: 'desc' });
+  const [sel, setSel] = useState(() => new Set());
+
+  useEffect(() => { admin.loadAllowed(); /* eslint-disable-next-line */ }, []);
+  const reload = () => { admin.loadAllowed(); setSel(new Set()); };
+
+  function toggleSort(k) {
+    setSort((s) => s.key === k ? { key: k, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: k === 'created' ? 'desc' : 'asc' });
+  }
+  function aVal(a, k) {
+    switch (k) {
+      case 'email': return (a.email || '').toLowerCase();
+      case 'name': return (a.full_name || '').toLowerCase();
+      case 'cohort': return (a.cohort || '').toLowerCase();
+      case 'reg': return a.registered ? 1 : 0;
+      default: return tsVal(a.created_at);
+    }
+  }
+
+  const q = norm(search.trim());
+  const filtered = (admin.allowed || []).filter((a) => {
+    if (q && !norm(`${a.email} ${a.full_name || ''}`).includes(q)) return false;
+    if (reg === 'registered') return a.registered;
+    if (reg === 'pending') return !a.registered;
+    return true;
+  });
+  const displayed = [...filtered].sort((x, y) => {
+    const vx = aVal(x, sort.key), vy = aVal(y, sort.key);
+    const c = typeof vx === 'string' ? vx.localeCompare(vy, 'pt') : (vx - vy);
+    return sort.dir === 'asc' ? c : -c;
+  });
+
+  const allOn = displayed.length > 0 && displayed.every((a) => sel.has(a.email));
+  const someOn = displayed.some((a) => sel.has(a.email));
+  function toggleOne(e) { setSel((p) => { const n = new Set(p); n.has(e) ? n.delete(e) : n.add(e); return n; }); }
+  function toggleAll() { setSel((p) => { const n = new Set(p); if (allOn) displayed.forEach((a) => n.delete(a.email)); else displayed.forEach((a) => n.add(a.email)); return n; }); }
+
+  async function removeSel() {
+    const emails = [...sel];
+    if (!emails.length) return;
+    if (!window.confirm(`Retirar ${emails.length} email(s) da lista de adicionados?\n\nDeixam de poder entrar. Quem já tiver acesso ativo (trial/pago) mantém-no até terminar — para cortar já, usa o separador Utilizadores.`)) return;
+    try { await admin.removeAllowed(emails); setSel(new Set()); admin.loadAllowed(); }
+    catch (e) { alert('Erro: ' + e.message); }
+  }
+
+  function exportCsv() {
+    const header = 'email,nome,segmento,registado,adicionado\n';
+    const body = displayed.map((a) => [a.email, (a.full_name || '').replace(/,/g, ' '), a.cohort || '', a.registered ? 'sim' : 'não', a.created_at].join(',')).join('\n');
+    const blob = new Blob([header + body], { type: 'text/csv' });
+    const el = document.createElement('a');
+    el.href = URL.createObjectURL(blob); el.download = 'adicionados_finmed.csv'; el.click();
+  }
+
+  return (
+    <div>
+      <p className="text-sm text-fm-text-soft mb-4">
+        Quem está autorizado a entrar (inscritos importados + adicionados à mão). "Registado" indica se a pessoa já criou conta na app.
+      </p>
+
+      <div className="flex gap-2 mb-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-2.5 text-fm-text-mute" size={16} />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar por email ou nome…" className="input pl-9 pr-9" />
+          {search && <button onClick={() => setSearch('')} className="absolute right-3 top-2.5 text-fm-text-mute hover:text-fm-green-dark" title="Limpar"><X size={16} /></button>}
+        </div>
+        <button type="button" onClick={reload} className="btn btn-ghost" title="Recarregar"><RefreshCw size={16} /></button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex gap-1.5">
+          {[['all', 'Todos'], ['registered', 'Registados'], ['pending', 'Por entrar']].map(([k, label]) => (
+            <button key={k} onClick={() => setReg(k)}
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${reg === k ? 'bg-fm-green text-white border-fm-green' : 'border-fm-border text-fm-text-soft hover:border-fm-green'}`}>{label}</button>
+          ))}
+        </div>
+        <div className="flex-1" />
+        <span className="text-xs text-fm-text-mute">{displayed.length} de {(admin.allowed || []).length}</span>
+        <button onClick={exportCsv} disabled={!displayed.length} className="btn btn-ghost text-sm disabled:opacity-50"><Download size={15} /> Exportar</button>
+      </div>
+
+      {sel.size > 0 && (
+        <div className="sticky top-2 z-20 mb-3 bg-fm-green-dark text-white rounded-xl px-3 py-2.5 shadow-fm-lg flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-sm px-1">{sel.size} selecionado(s)</span>
+          <div className="flex-1" />
+          <button onClick={removeSel} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-fm-danger text-white hover:opacity-90"><Trash2 size={14} className="inline mr-1" /> Retirar da lista</button>
+          <button onClick={() => setSel(new Set())} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/20">Limpar</button>
+        </div>
+      )}
+
+      <div className="bg-fm-paper border border-fm-border rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-fm-ivory text-fm-text-mute text-xs uppercase tracking-wide">
+              <tr>
+                <th className="px-4 py-3 w-10"><CheckAll checked={allOn} indeterminate={someOn} onChange={toggleAll} /></th>
+                <SortHeader label="Email" k="email" sort={sort} onSort={toggleSort} className="text-left px-4 py-3" />
+                <SortHeader label="Nome" k="name" sort={sort} onSort={toggleSort} className="text-left px-4 py-3 hidden sm:table-cell" />
+                <SortHeader label="Segmento" k="cohort" sort={sort} onSort={toggleSort} className="text-left px-4 py-3 hidden md:table-cell" />
+                <SortHeader label="Registado" k="reg" sort={sort} onSort={toggleSort} className="text-left px-4 py-3" />
+                <SortHeader label="Adicionado" k="created" sort={sort} onSort={toggleSort} className="text-left px-4 py-3 hidden lg:table-cell" />
+              </tr>
+            </thead>
+            <tbody>
+              {displayed.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-fm-text-mute">Sem adicionados.</td></tr>}
+              {displayed.map((a) => (
+                <tr key={a.email} className={`border-t border-fm-border hover:bg-fm-ivory/50 ${sel.has(a.email) ? 'bg-fm-yellow/10' : ''}`}>
+                  <td className="px-4 py-3"><input type="checkbox" checked={sel.has(a.email)} onChange={() => toggleOne(a.email)} className="w-4 h-4 accent-fm-green cursor-pointer align-middle" /></td>
+                  <td className="px-4 py-3 text-fm-green-dark font-medium">{a.email}</td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-fm-text-soft">{a.full_name || '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-fm-text-mute text-xs">{a.cohort || '—'}</td>
+                  <td className="px-4 py-3">
+                    {a.registered
+                      ? <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-fm-green/15 text-fm-green-dark">Sim</span>
+                      : <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-fm-border text-fm-text-mute">Por entrar</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-fm-text-soft">{fmtDate(a.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
