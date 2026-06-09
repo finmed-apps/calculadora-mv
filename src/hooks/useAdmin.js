@@ -12,6 +12,7 @@ export function useAdmin() {
   const [audit, setAudit] = useState([]);
   const [usage, setUsage] = useState(null);
   const [billing, setBilling] = useState(null);
+  const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -55,6 +56,14 @@ export function useAdmin() {
     try { setBilling(await wrap(supabase.rpc('admin_billing'))); }
     catch (e) { setError(e.message); }
   }, []);
+
+  const loadFeedback = useCallback(async () => {
+    try { setFeedback(await wrap(supabase.rpc('admin_list_feedback', { p_limit: 300 })) || []); }
+    catch (e) { setError(e.message); }
+  }, []);
+
+  const resolveFeedback = (id, val) =>
+    wrap(supabase.rpc('admin_resolve_feedback', { p_id: id, p_resolved: val }));
 
   const loadWaitlist = useCallback(async () => {
     try { setWaitlist(await wrap(supabase.rpc('admin_list_waitlist', { p_limit: 1000 })) || []); }
@@ -114,6 +123,9 @@ export function useAdmin() {
   const bulkDelete = (ids) =>
     wrap(supabase.rpc('admin_bulk_delete', { p_ids: ids }));
 
+  const removeAllowed = (emails) =>
+    wrap(supabase.rpc('admin_remove_allowed', { p_emails: emails }));
+
   const importAllowed = (rows, cohort) =>
     wrap(supabase.rpc('admin_import_allowed', { p_rows: rows, p_cohort: cohort }));
 
@@ -128,12 +140,13 @@ export function useAdmin() {
   };
 
   return {
-    users, config, waitlist, allowed, stats, audit, usage, billing, loading, error,
-    loadUsers, loadConfig, loadWaitlist, loadAllowed, loadStats, loadAudit, loadUsage, loadBilling,
+    users, config, waitlist, allowed, stats, audit, usage, billing, feedback, loading, error,
+    loadUsers, loadConfig, loadWaitlist, loadAllowed, loadStats, loadAudit, loadUsage, loadBilling, loadFeedback, resolveFeedback,
     setSuspended, grantDays, setTrial, setAdmin, setAllowedFlag,
     massLock, massUnlock, massGrantDays, massSetTrial,
     addOrGrant, deleteUser, importAllowed, saveConfig,
     bulkSetSuspended, bulkGrantDays, bulkSetTrial, bulkSetAllowed, bulkDelete,
+    removeAllowed,
   };
 }
 

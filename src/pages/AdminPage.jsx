@@ -4,6 +4,7 @@ import {
   Settings, ListChecks, RefreshCw, X, Crown, Ban, Check,
   UserPlus, Trash2, Download, CalendarClock, ScrollText, HelpCircle,
   ArrowUp, ArrowDown, ArrowUpDown, Mail, LayoutDashboard, Wallet, TrendingUp, FileText, UserCheck,
+  MessageSquare, Bug, Lightbulb,
 } from 'lucide-react';
 import { useAdmin, parseEnrolleesFile } from '../hooks/useAdmin';
 import { AdminGuide, hasSeenAdminGuide, markAdminGuideSeen } from '../components/AdminGuide';
@@ -172,6 +173,7 @@ export function AdminPage() {
         <TabBtn active={tab === 'import'} onClick={() => setTab('import')} icon={Upload}>Importar inscritos</TabBtn>
         <TabBtn active={tab === 'allowlist'} onClick={() => setTab('allowlist')} icon={UserCheck}>Adicionados</TabBtn>
         <TabBtn active={tab === 'waitlist'} onClick={() => setTab('waitlist')} icon={ListChecks}>Lista de espera</TabBtn>
+        <TabBtn active={tab === 'feedback'} onClick={() => setTab('feedback')} icon={MessageSquare}>Feedback</TabBtn>
         <TabBtn active={tab === 'audit'} onClick={() => setTab('audit')} icon={ScrollText}>Registo</TabBtn>
         <TabBtn active={tab === 'settings'} onClick={() => setTab('settings')} icon={Settings}>Definições</TabBtn>
       </div>
@@ -186,6 +188,7 @@ export function AdminPage() {
       {tab === 'import' && <ImportTab admin={admin} />}
       {tab === 'allowlist' && <AllowlistTab admin={admin} />}
       {tab === 'waitlist' && <WaitlistTab admin={admin} />}
+      {tab === 'feedback' && <FeedbackTab admin={admin} />}
       {tab === 'audit' && <AuditTab admin={admin} />}
       {tab === 'settings' && <SettingsTab admin={admin} />}
     </main>
@@ -1023,6 +1026,69 @@ function AllowlistTab({ admin }) {
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TAB: FEEDBACK
+// ============================================================
+const FB_KIND = {
+  bug: { t: 'Erro', icon: Bug, c: 'bg-fm-danger/15 text-fm-danger' },
+  sugestao: { t: 'Sugestão', icon: Lightbulb, c: 'bg-fm-yellow/30 text-fm-green-dark' },
+  outro: { t: 'Outro', icon: MessageSquare, c: 'bg-fm-border text-fm-text-mute' },
+};
+
+function FeedbackTab({ admin }) {
+  const [filter, setFilter] = useState('open');
+  useEffect(() => { admin.loadFeedback(); /* eslint-disable-next-line */ }, []);
+
+  async function toggle(f) {
+    try { await admin.resolveFeedback(f.id, !f.resolved); admin.loadFeedback(); }
+    catch (e) { alert('Erro: ' + e.message); }
+  }
+
+  const items = (admin.feedback || []).filter((f) => {
+    if (filter === 'open') return !f.resolved;
+    if (filter === 'all') return true;
+    return f.kind === filter;
+  });
+
+  return (
+    <div className="max-w-3xl">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex flex-wrap gap-1.5">
+          {[['open', 'Por resolver'], ['all', 'Todos'], ['bug', 'Erros'], ['sugestao', 'Sugestões'], ['outro', 'Outros']].map(([k, l]) => (
+            <button key={k} onClick={() => setFilter(k)}
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${filter === k ? 'bg-fm-green text-white border-fm-green' : 'border-fm-border text-fm-text-soft hover:border-fm-green'}`}>{l}</button>
+          ))}
+        </div>
+        <div className="flex-1" />
+        <button onClick={() => admin.loadFeedback()} className="btn btn-ghost text-sm"><RefreshCw size={15} /> Atualizar</button>
+      </div>
+
+      <div className="space-y-3">
+        {items.length === 0 && <div className="text-fm-text-mute text-sm py-10 text-center bg-fm-paper border border-fm-border rounded-xl">Sem feedback.</div>}
+        {items.map((f) => {
+          const k = FB_KIND[f.kind] || FB_KIND.outro;
+          const I = k.icon;
+          return (
+            <div key={f.id} className={`bg-fm-paper border border-fm-border rounded-xl p-4 ${f.resolved ? 'opacity-65' : ''}`}>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${k.c}`}><I size={12} /> {k.t}</span>
+                <span className="text-xs text-fm-text-mute">{new Date(f.created_at).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <p className="text-sm text-fm-text whitespace-pre-wrap mb-2 leading-relaxed">{f.message}</p>
+              <div className="flex items-center justify-between gap-3 text-xs text-fm-text-mute">
+                <span className="truncate">{f.email || '—'} · {f.page || '—'}</span>
+                <button onClick={() => toggle(f)} className={`font-semibold whitespace-nowrap ${f.resolved ? 'text-fm-text-mute' : 'text-fm-green'} hover:underline`}>
+                  {f.resolved ? 'Reabrir' : 'Marcar resolvido'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

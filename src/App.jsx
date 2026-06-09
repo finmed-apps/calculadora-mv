@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { TrialBanner } from './components/TrialBanner';
+import { FeedbackButton } from './components/FeedbackButton';
 import { RequireAuth } from './components/RequireAuth';
 import { RequireAdmin } from './components/RequireAdmin';
 import { AccessGate } from './components/AccessGate';
@@ -53,6 +54,7 @@ export default function App() {
         </Routes>
       </div>
       {showStandardHeader && <Footer />}
+      {showStandardHeader && <FeedbackButton />}
     </div>
   );
 }
