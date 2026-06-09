@@ -1,20 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 // Conta suavemente até ao valor (easeOutCubic). Usa o formatador dado.
-// Respeita prefers-reduced-motion (salta direto ao valor final).
+// Na primeira aparição conta a partir de 0; em mudanças seguintes conta a
+// partir do valor anterior. Respeita prefers-reduced-motion (salta ao valor).
 export function AnimatedNumber({ value, format = (n) => String(n), duration = 700, className }) {
-  const [display, setDisplay] = useState(Number(value) || 0);
-  const fromRef = useRef(Number(value) || 0);
+  const [display, setDisplay] = useState(0);
+  const fromRef = useRef(0);
   const rafRef = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const target = Number(value);
     const reduce = typeof window !== 'undefined'
       && window.matchMedia
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (!isFinite(target) || reduce) {
-      setDisplay(target);
+      setDisplay(isFinite(target) ? target : 0);
       fromRef.current = isFinite(target) ? target : 0;
       return;
     }
