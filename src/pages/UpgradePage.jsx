@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useAccess } from '../hooks/useAccess';
 import { useState } from 'react';
+import { PAYMENTS_ENABLED } from '../lib/config';
 
 // Os benefícios mensais equivalentes:
 // 6 meses por 65€  →  10,83 €/mês
@@ -130,6 +131,25 @@ export function UpgradePage() {
           <p className="text-fm-text-soft mb-8">Válido até <strong>{fmtDate(access.effectiveEnd)}</strong>.</p>
         )}
         <a href="/app" className="btn btn-primary">← Voltar à calculadora</a>
+      </main>
+    );
+  }
+
+  // Pagamentos ainda não configurados → nunca mostrar preços nem "Subscrever".
+  if (!PAYMENTS_ENABLED) {
+    return (
+      <main className="max-w-xl mx-auto px-5 py-16 text-center">
+        <span className="inline-flex items-center gap-1.5 bg-fm-yellow/30 text-fm-green-dark px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase mb-4">
+          <Clock size={12} /> Brevemente
+        </span>
+        <h1 className="font-display font-bold text-fm-green-dark text-3xl mb-3">
+          {access.state === 'expired' ? 'O teu período de acesso terminou' : 'Acesso à calculadora'}
+        </h1>
+        <p className="text-fm-text-soft mb-8">
+          A opção de renovar o acesso vai estar disponível muito em breve. Entretanto,
+          se precisares de manter o acesso, fala com a equipa FINMED.
+        </p>
+        <a href="mailto:suporte@finmed.pt" className="btn btn-primary">Contactar a FINMED</a>
       </main>
     );
   }

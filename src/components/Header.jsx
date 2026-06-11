@@ -5,6 +5,7 @@ import { Avatar } from './Avatar';
 import { useAuth } from '../hooks/useAuth';
 import { useAccess } from '../hooks/useAccess';
 import { useProfile } from '../hooks/useProfile';
+import { PAYMENTS_ENABLED } from '../lib/config';
 
 export function Header() {
   const { user, signOut } = useAuth();
@@ -82,8 +83,10 @@ function AccessChip({ access }) {
     );
   }
 
-  // Trial terminado (ou sem acesso) mas dentro da lista → pode ver planos.
-  if (access.state === 'expired' || access.state === 'none') {
+  // Trial terminado (ou sem acesso) — só mostramos "Ver planos" se os
+  // pagamentos estiverem ligados. Enquanto o Stripe não está configurado,
+  // não aparece qualquer opção de pagar.
+  if (PAYMENTS_ENABLED && (access.state === 'expired' || access.state === 'none')) {
     return (
       <Link to="/app/upgrade" className="inline-flex items-center gap-1.5 bg-fm-yellow text-fm-green-dark px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-fm-yellow-dark transition-colors">
         <Crown size={12} /> Ver planos

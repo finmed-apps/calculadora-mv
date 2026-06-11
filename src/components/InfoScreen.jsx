@@ -77,7 +77,7 @@ export function InfoScreen({ scenario, onBack }) {
         <p className="text-sm text-fm-text-soft mb-4">
           As regras de isenção têm nuances que dependem do caso concreto (data exata de aquisição, herança vs compra, obras posteriores). Antes de declarar a operação no IRS, vale a pena uma confirmação técnica.
         </p>
-        <a href="https://finmed.pt/consultoria" target="_blank" rel="noopener" className="btn btn-dark">
+        <a href="https://api.leadconnectorhq.com/widget/survey/db5HCMe4YhWeJdYk969X" target="_blank" rel="noopener" className="btn btn-dark">
           <MessageSquare size={16} /> Agendar consultoria FINMED →
         </a>
       </div>

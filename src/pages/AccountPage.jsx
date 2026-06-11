@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useAccess } from '../hooks/useAccess';
 import { useProfile } from '../hooks/useProfile';
 import { resetOnboarding } from '../components/OnboardingModal';
+import { PAYMENTS_ENABLED } from '../lib/config';
 import { APP_VERSION } from '../App';
 
 function fmtDate(d) {
@@ -213,9 +214,12 @@ export function AccountPage() {
           </p>
         )}
 
-        {/* Só mostramos "Ver planos" (com preços) DEPOIS do trial terminar */}
+        {/* Só mostramos "Ver planos" DEPOIS do trial terminar E se os pagamentos
+            estiverem ligados. Sem Stripe configurado, não aparece opção de pagar. */}
         {(access.state === 'expired' || access.state === 'none') && (
-          <a href="/app/upgrade" className="btn btn-primary mt-4">Ver planos →</a>
+          PAYMENTS_ENABLED
+            ? <a href="/app/upgrade" className="btn btn-primary mt-4">Ver planos →</a>
+            : <p className="text-fm-text-mute text-sm mt-4">A opção de renovar vai estar disponível em breve.</p>
         )}
       </section>
 

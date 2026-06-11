@@ -148,7 +148,7 @@ export function Result({ result, onEdit, onReset, onSave, onExportPdf, saving, s
               Agende uma consultoria com a equipa FINMED antes da escritura.
             </div>
           </div>
-          <a href="https://finmed.pt/consultoria" target="_blank" rel="noopener" className="btn btn-dark">
+          <a href="https://api.leadconnectorhq.com/widget/survey/db5HCMe4YhWeJdYk969X" target="_blank" rel="noopener" className="btn btn-dark">
             <MessageSquare size={16} /> Agendar consultoria →
           </a>
         </div>
