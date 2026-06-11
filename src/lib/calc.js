@@ -281,6 +281,194 @@ export function calcular(inputs) {
 }
 
 // ============================================================
+// SIMULADORES: Doações, Heranças, HS-Novo Pacote
+// Tabela de IRS e fórmulas validadas com os Excels da Luísa (Data_Base).
+// ============================================================
+
+// Tabela de IRS progressiva partilhada pelos 3 simuladores (sheet Data_Base).
+// IRS = tributável × taxa − parcela a abater (lookup progressivo).
+export const ESCALOES_IRS_MV = [
+  { min: 0,      max: 8059,     taxa: 0.130, abater: 0 },
+  { min: 8059,   max: 12160,    taxa: 0.165, abater: 282.07 },
+  { min: 12160,  max: 17233,    taxa: 0.220, abater: 950.87 },
+  { min: 17233,  max: 22306,    taxa: 0.250, abater: 1467.86 },
+  { min: 22306,  max: 28400,    taxa: 0.320, abater: 3029.28 },
+  { min: 28400,  max: 41629,    taxa: 0.355, abater: 4023.28 },
+  { min: 41629,  max: 44987,    taxa: 0.435, abater: 7353.60 },
+  { min: 44987,  max: 83696,    taxa: 0.450, abater: 8028.40 },
+  { min: 83696,  max: Infinity, taxa: 0.480, abater: 10539.28 },
+];
+
+export function irsSobreMV(tributavel) {
+  const t = Number(tributavel) || 0;
+  if (t <= 0) return { irs: 0, escalao: ESCALOES_IRS_MV[0], taxaEfetiva: 0 };
+  let escalao = ESCALOES_IRS_MV[ESCALOES_IRS_MV.length - 1];
+  for (const e of ESCALOES_IRS_MV) {
+    if (t >= e.min && t < e.max) { escalao = e; break; }
+  }
+  const irs = Math.max(t * escalao.taxa - escalao.abater, 0);
+  return { irs, escalao, taxaEfetiva: irs / t };
+}
+
+// Coeficiente de desvalorização pelo ANO de aquisição (óbito/doação/compra),
+// usando a Portaria mais recente disponível (382/2025).
+export function coeficienteAno(ano) {
+  if (!ano) return { coef: 1, motivo: 'ano em falta' };
+  const tabela = COEFICIENTES[2025];
+  for (const [ini, fim, coef] of tabela.ranges) {
+    if (ano >= ini && ano <= fim) return { coef, portaria: tabela.portaria, ano };
+  }
+  // Ano posterior ao último publicado → coeficiente ainda não publicado (assume 1,00)
+  return { coef: 1, naoPublicado: true, portaria: tabela.portaria, ano };
+}
+
+const num = (v) => Number(v) || 0;
+const anoDe = (d) => (d ? new Date(d).getFullYear() : null);
+
+// ------------------------------------------------------------
+// DOAÇÕES — venda de imóvel recebido por doação (direta/indireta)
+// ------------------------------------------------------------
+export function calcularDoacao(inputs) {
+  const { tipoDoacao, dataDoacao, vptDireta = 0, vptIndireta = 0, valorVenda = 0, comissao = 0, melhoria = 0 } = inputs;
+  const totalDespesas = num(comissao) + num(melhoria);
+  const valorAquisicao = tipoDoacao === 'indireta' ? num(vptIndireta) : num(vptDireta);
+  const coefInfo = coeficienteAno(anoDe(dataDoacao));
+  const coef = coefInfo.coef;
+
+  const maisValiaBruta = num(valorVenda) - valorAquisicao * coef - totalDespesas;
+  const mvEnglobada = Math.max(maisValiaBruta * 0.5, 0);
+  const { irs, escalao, taxaEfetiva } = irsSobreMV(mvEnglobada);
+
+  const alerts = [];
+  if (maisValiaBruta < 0) {
+    alerts.push({ level: 'info', text: 'Não existem mais-valias a declarar — o valor de venda não cobre o valor de aquisição corrigido + despesas.' });
+  }
+  if (coefInfo.naoPublicado) {
+    alerts.push({ level: 'warning', text: `O coeficiente de desvalorização para ${coefInfo.ano} ainda não foi publicado. Foi usado 1,00; será atualizado quando disponível.` });
+  }
+  alerts.push({ level: 'info', text: 'O IRS apresentado é uma estimativa apenas sobre esta mais-valia. O imposto real pode ser superior consoante os restantes rendimentos do ano.' });
+
+  return {
+    scenario: 'doacao', inputs: { ...inputs, scenario: 'doacao', totalDespesas },
+    tipoDoacao, dataDoacao, valorAquisicao, coef, coefInfo, totalDespesas,
+    maisValiaBruta, mvEnglobada, irs, escalao, taxaEfetiva, alerts,
+  };
+}
+
+// ------------------------------------------------------------
+// HERANÇAS — 2 momentos de aquisição (1.º e 2.º óbito), repartição %
+// ------------------------------------------------------------
+export function calcularHeranca(inputs) {
+  const { data1, data2, vpt1 = 0, pct1 = 0, vpt2 = 0, pct2 = 0, valorVenda = 0, comissao = 0, melhoria = 0 } = inputs;
+  const totalDespesas = num(comissao) + num(melhoria);
+  const p1 = num(pct1), p2 = num(pct2); // frações 0-1
+  const coef1Info = coeficienteAno(anoDe(data1));
+  const coef2Info = coeficienteAno(anoDe(data2));
+  const coef1 = coef1Info.coef, coef2 = coef2Info.coef;
+
+  const aq1 = num(vpt1) * p1, aq2 = num(vpt2) * p2;
+  const venda1 = num(valorVenda) * p1, venda2 = num(valorVenda) * p2;
+  const desp1 = totalDespesas * p1, desp2 = totalDespesas * p2;
+
+  const mv1 = venda1 - aq1 * coef1 - desp1; // mais-valia bruta por momento
+  const mv2 = venda2 - aq2 * coef2 - desp2;
+  const totalMV = mv1 + mv2;
+  const mvEnglobada = Math.max(totalMV, 0) * 0.5;
+  const { irs, escalao, taxaEfetiva } = irsSobreMV(mvEnglobada);
+
+  const alerts = [];
+  if (mv1 < 0 || mv2 < 0) {
+    alerts.push({ level: 'info', text: 'Um dos momentos de aquisição é uma menos-valia. As mais e menos-valias do imóvel são consideradas em conjunto no apuramento total.' });
+  }
+  if (totalMV <= 0) {
+    alerts.push({ level: 'info', text: 'Não existem mais-valias a declarar — o total apurado não é positivo.' });
+  }
+  if (coef1Info.naoPublicado || coef2Info.naoPublicado) {
+    alerts.push({ level: 'warning', text: 'O coeficiente de desvalorização para um dos anos ainda não foi publicado. Foi usado 1,00; será atualizado quando disponível.' });
+  }
+  alerts.push({ level: 'info', text: 'O IRS apresentado é uma estimativa apenas sobre esta mais-valia. O imposto real pode ser superior consoante os restantes rendimentos do ano.' });
+
+  return {
+    scenario: 'heranca', inputs: { ...inputs, scenario: 'heranca', totalDespesas },
+    coef1, coef2, coef1Info, coef2Info, aq1, aq2, mv1, mv2, totalMV,
+    totalDespesas, mvEnglobada, irs, escalao, taxaEfetiva, alerts,
+  };
+}
+
+// ------------------------------------------------------------
+// HS-NOVO PACOTE — habitação secundária com reinvestimento (regime 2026-2029)
+// ------------------------------------------------------------
+const LIMITE_FINANCIAMENTO = 0.70;
+const REGIME_INICIO = '2026-01-01';
+const REGIME_FIM = '2029-12-31';
+
+export function calcularHS(inputs) {
+  const { dataCompra, dataVenda, valorCompra = 0, valorVenda = 0, dividaBanco = 0, despesas = {}, valorNovaCasa = 0 } = inputs;
+  const totalDespesas =
+    num(despesas.escritura) + num(despesas.selo) + num(despesas.cert) +
+    num(despesas.imt) + num(despesas.comissao) + num(despesas.melhoria);
+
+  const coefInfo = coeficienteAno(anoDe(dataCompra));
+  const coef = coefInfo.coef;
+
+  const maisValiaBruta = num(valorVenda) - num(valorCompra) * coef - totalDespesas;
+  const mvTributavelBase = Math.max(maisValiaBruta, 0) * 0.5;
+  const ganho = num(valorVenda) - num(dividaBanco); // valor mínimo a reinvestir
+
+  const dentroJanela = dataVenda
+    ? (new Date(dataVenda) >= new Date(REGIME_INICIO) && new Date(dataVenda) <= new Date(REGIME_FIM))
+    : null;
+
+  const temNovaCasa = num(valorNovaCasa) > 0;
+  let finMax = null, valorReinvestido = null, valorNaoReinvestido = null, proporcaoNaoReinv = null;
+  let mvTributavelFinal = null;
+  let estado = 'parcial'; // parcial (sem nova casa) | excluido | tributado | foraJanela
+
+  if (dataVenda && dentroJanela === false) {
+    // Regime não se aplica → MV tributada na totalidade
+    mvTributavelFinal = mvTributavelBase;
+    estado = 'foraJanela';
+  } else if (temNovaCasa) {
+    finMax = num(valorNovaCasa) * LIMITE_FINANCIAMENTO;
+    valorReinvestido = num(valorNovaCasa) * (1 - LIMITE_FINANCIAMENTO);
+    valorNaoReinvestido = ganho - valorReinvestido;
+    proporcaoNaoReinv = ganho > 0 ? Math.min(Math.max(valorNaoReinvestido / ganho, 0), 1) : 0;
+    if (maisValiaBruta < 0) { mvTributavelFinal = 0; estado = 'menosvalia'; }
+    else if (valorNaoReinvestido <= 0) { mvTributavelFinal = 0; estado = 'excluido'; }
+    else { mvTributavelFinal = proporcaoNaoReinv * mvTributavelBase; estado = 'tributado'; }
+  }
+
+  const { irs, escalao, taxaEfetiva } = irsSobreMV(mvTributavelFinal || 0);
+
+  const alerts = [];
+  if (maisValiaBruta < 0) {
+    alerts.push({ level: 'info', text: 'Não existem mais-valias a declarar — o valor de venda não cobre o valor de compra corrigido + despesas.' });
+  } else if (estado === 'foraJanela') {
+    alerts.push({ level: 'danger', text: 'A data de venda está fora da janela do regime (01/01/2026 a 31/12/2029). A exclusão por reinvestimento não se aplica e a mais-valia é tributada na totalidade.' });
+  } else if (estado === 'excluido') {
+    alerts.push({ level: 'success', text: 'Com este reinvestimento, as suas mais-valias ficam totalmente excluídas de tributação (cumprindo todas as condições do regime).' });
+  } else if (estado === 'tributado') {
+    alerts.push({ level: 'warning', text: `Reinvestimento parcial: ${formatPct(1 - proporcaoNaoReinv)} do ganho fica reinvestido. A parte não reinvestida é tributada proporcionalmente.` });
+  } else if (estado === 'parcial') {
+    alerts.push({ level: 'info', text: `Preenche o valor da nova casa para simular o reinvestimento. Para excluir totalmente as mais-valias, precisa de reinvestir pelo menos ${formatEuro(ganho)} (o ganho da venda) sem recurso a crédito acima de ${formatPct(LIMITE_FINANCIAMENTO)}.` });
+  }
+  if (dentroJanela === true) {
+    // ok, dentro da janela
+  }
+  if (coefInfo.naoPublicado) {
+    alerts.push({ level: 'warning', text: `O coeficiente de desvalorização para ${coefInfo.ano} ainda não foi publicado. Foi usado 1,00; será atualizado quando disponível.` });
+  }
+  alerts.push({ level: 'info', text: 'O IRS apresentado é uma estimativa apenas sobre esta mais-valia. O imposto real pode ser superior consoante os restantes rendimentos do ano.' });
+
+  return {
+    scenario: 'hs_novo', inputs: { ...inputs, scenario: 'hs_novo', totalDespesas },
+    coef, coefInfo, totalDespesas, maisValiaBruta, mvTributavelBase, ganho,
+    dentroJanela, temNovaCasa, finMax, valorReinvestido, valorNaoReinvestido,
+    proporcaoNaoReinv, mvTributavelFinal, estado, irs, escalao, taxaEfetiva, alerts,
+  };
+}
+
+// ============================================================
 // FORMATTERS
 // ============================================================
 export const formatEuro = (v) =>

@@ -1,4 +1,4 @@
-import { Building2, Landmark, Home, BarChart3 } from 'lucide-react';
+import { Building2, Landmark, Home, BarChart3, Scroll, Gift, KeyRound } from 'lucide-react';
 
 const SCENARIOS = [
   {
@@ -24,6 +24,24 @@ const SCENARIOS = [
     icon: BarChart3,
     title: 'Caso geral (tributável)',
     desc: 'Segunda habitação, arrendamento, terrenos. 50% da mais-valia entra em IRS pelas taxas do escalão.',
+  },
+  {
+    id: 'heranca',
+    icon: Scroll,
+    title: 'Imóvel recebido por herança',
+    desc: 'Venda de imóvel herdado, com os dois momentos de aquisição (1.º e 2.º óbito). Apura a mais-valia por momento e o IRS estimado.',
+  },
+  {
+    id: 'doacao',
+    icon: Gift,
+    title: 'Imóvel recebido por doação',
+    desc: 'Venda de imóvel recebido por doação direta ou indireta. Determina o VPT de aquisição e o IRS sobre a mais-valia.',
+  },
+  {
+    id: 'hs_novo',
+    icon: KeyRound,
+    title: 'Habitação secundária com reinvestimento',
+    desc: 'Regime "Novo Pacote" (2026-2029): exclusão de mais-valias se reinvestires o produto da venda em arrendamento acessível.',
   },
 ];
 

@@ -29,6 +29,111 @@ function getInitials(name) {
   return parts[0].slice(0, 2).toUpperCase();
 }
 
+const pdfRow = (lbl, val) => `<div class="row"><span class="lbl">${lbl}</span><span class="val">${val}</span></div>`;
+const pdfCard = (lbl, val) => `<div class="card"><div class="lbl">${lbl}</div><div class="val">${val}</div></div>`;
+const heroBox = (label, value) => `<div class="hero"><div class="hero-label">${label}</div><div class="hero-value">${fmtEuro(value)}</div></div>`;
+const coefTxt = (c) => String(c ?? '').replace('.', ',');
+
+// Corpo do relatório por cenário (mantém o geral/HPP exatamente como antes).
+function buildBody(scenario, sim, inp, out) {
+  const title = escapeHtml(sim.label || 'Simulação de Mais-Valia');
+
+  if (scenario === 'doacao') {
+    const tipo = out.tipoDoacao === 'indireta' ? 'Indireta' : 'Direta';
+    return `<h1>${title}</h1>
+<div class="scenario-label">Cenário: Imóvel recebido por doação (${tipo.toLowerCase()})</div>
+${heroBox('IRS estimado sobre a mais-valia', out.irsIsolado)}
+<h2>Dados introduzidos</h2>
+<div class="rows">
+${pdfRow('Tipo de doação', tipo)}
+${pdfRow('Data da doação', fmtDate(inp.dataDoacao))}
+${pdfRow('Valor de aquisição (VPT)', fmtEuro(out.valorAquisicao))}
+${pdfRow('Valor de venda', fmtEuro(inp.valorVenda))}
+${pdfRow('Total despesas', fmtEuro(out.totalDespesas))}
+</div>
+<h2>Resultados</h2>
+<div class="grid">
+${pdfCard('Coeficiente aplicado', coefTxt(out.coef))}
+${pdfCard('Mais-valia apurada', fmtEuro(out.maisValiaBruta))}
+${pdfCard('Valor a englobar (50%)', fmtEuro(out.mvEnglobada))}
+${pdfCard('Taxa efetiva', out.mvEnglobada > 0 ? fmtPct(out.taxaEfetiva) : 'n/a')}
+</div>`;
+  }
+
+  if (scenario === 'heranca') {
+    const p1 = Math.round((inp.pct1 || 0) * 100), p2 = Math.round((inp.pct2 || 0) * 100);
+    return `<h1>${title}</h1>
+<div class="scenario-label">Cenário: Imóvel recebido por herança (1.º e 2.º óbito)</div>
+${heroBox('IRS estimado sobre a mais-valia', out.irsIsolado)}
+<h2>Dados introduzidos</h2>
+<div class="rows">
+${pdfRow('Data do 1.º óbito', fmtDate(inp.data1))}
+${pdfRow('Data do 2.º óbito', fmtDate(inp.data2))}
+${pdfRow('VPT 1.º óbito · % adquirida', fmtEuro(inp.vpt1) + ' · ' + p1 + '%')}
+${pdfRow('VPT 2.º óbito · % adquirida', fmtEuro(inp.vpt2) + ' · ' + p2 + '%')}
+${pdfRow('Valor de venda', fmtEuro(inp.valorVenda))}
+${pdfRow('Total despesas', fmtEuro(out.totalDespesas))}
+</div>
+<h2>Resultados</h2>
+<div class="grid">
+${pdfCard('Aquisição 1.º óbito', fmtEuro(out.aq1))}
+${pdfCard('Mais-valia 1.º momento', fmtEuro(out.mv1))}
+${pdfCard('Aquisição 2.º óbito', fmtEuro(out.aq2))}
+${pdfCard('Mais-valia 2.º momento', fmtEuro(out.mv2))}
+${pdfCard('Total mais-valias', fmtEuro(out.totalMV))}
+${pdfCard('Valor a englobar (50%)', fmtEuro(out.mvEnglobada))}
+</div>`;
+  }
+
+  if (scenario === 'hs_novo') {
+    return `<h1>${title}</h1>
+<div class="scenario-label">Cenário: Habitação secundária com reinvestimento (Novo Pacote)</div>
+${heroBox('IRS estimado sobre a mais-valia', out.irsIsolado)}
+<h2>Dados introduzidos</h2>
+<div class="rows">
+${pdfRow('Data de compra', fmtDate(inp.dataCompra))}
+${pdfRow('Data de venda', fmtDate(inp.dataVenda))}
+${pdfRow('Valor de compra', fmtEuro(inp.valorCompra))}
+${pdfRow('Valor de venda', fmtEuro(inp.valorVenda))}
+${pdfRow('Valor em dívida ao banco', fmtEuro(inp.dividaBanco))}
+${pdfRow('Total despesas', fmtEuro(out.totalDespesas))}
+${inp.valorNovaCasa ? pdfRow('Valor da nova casa', fmtEuro(inp.valorNovaCasa)) : ''}
+</div>
+<h2>Resultados</h2>
+<div class="grid">
+${pdfCard('Mais-valia apurada', fmtEuro(out.maisValiaBruta))}
+${pdfCard('Tributável (50%)', fmtEuro(out.mvTributavelBase))}
+${pdfCard('Ganho da venda', fmtEuro(out.ganho))}
+${out.temNovaCasa ? pdfCard('Financiamento máx. (70%)', fmtEuro(out.finMax)) : ''}
+${out.temNovaCasa ? pdfCard('Valor não reinvestido', fmtEuro(Math.max(out.valorNaoReinvestido || 0, 0))) : ''}
+${out.mvTributavelFinal != null ? pdfCard('MV tributável final', fmtEuro(out.mvTributavelFinal)) : ''}
+</div>`;
+  }
+
+  // geral / hpp (comportamento original)
+  const isHPP = inp.scenario === 'hpp';
+  return `<h1>${title}</h1>
+<div class="scenario-label">${isHPP ? 'Cenário: HPP com reinvestimento' : 'Cenário: Caso geral (tributável)'}</div>
+${heroBox('IRS estimado sobre a mais-valia', out.irsIsolado)}
+<h2>Dados introduzidos</h2>
+<div class="rows">
+${pdfRow('Data de aquisição', fmtDate(inp.dataCompra))}
+${pdfRow('Data de venda', fmtDate(inp.dataVenda))}
+${pdfRow('Valor de aquisição', fmtEuro(inp.valorCompra))}
+${pdfRow('Valor de venda', fmtEuro(inp.valorVenda))}
+${pdfRow('Despesas dedutíveis', fmtEuro(out.totalDespesas))}
+${isHPP ? pdfRow('Capital em dívida', fmtEuro(inp.hpp?.dividaBanco)) + pdfRow('Valor nova HPP', fmtEuro(inp.hpp?.novaValor)) + pdfRow('% financiada nova HPP', (inp.hpp?.novaPercent ?? 0) + '%') : ''}
+</div>
+<h2>Resultados</h2>
+<div class="grid">
+${pdfCard('Mais-valia bruta', fmtEuro(out.maisValia))}
+${pdfCard('Tributável 50%', fmtEuro(out.tributavel50))}
+${isHPP ? pdfCard('Ganho da venda', fmtEuro(out.ganhoVenda)) + pdfCard('Reinvestido (próprio)', fmtEuro(out.valorReinvestido)) + pdfCard('Não reinvestido', fmtEuro(out.valorNaoReinvestido)) : ''}
+${pdfCard('Tributável final', fmtEuro(out.tributavelFinal))}
+${pdfCard('Taxa efetiva', out.tributavelFinal > 0 ? fmtPct(out.taxaEfetiva) : 'n/a')}
+</div>`;
+}
+
 /**
  * Renderiza o HTML do relatório.
  * @param {object} args
@@ -39,7 +144,7 @@ export function renderReportHtml({ simulation, profile }) {
   const sim = simulation || {};
   const inp = sim.inputs || {};
   const out = sim.outputs || {};
-  const isHPP = inp.scenario === 'hpp';
+  const bodyHtml = buildBody(inp.scenario, sim, inp, out);
 
   const userName = profile?.full_name || profile?.email || 'Cliente';
   const userEmail = profile?.email || '';
@@ -165,40 +270,7 @@ export function renderReportHtml({ simulation, profile }) {
   </div>
 </div>
 
-<h1>${escapeHtml(sim.label || 'Simulação de Mais-Valia')}</h1>
-<div class="scenario-label">${isHPP ? 'Cenário: HPP com reinvestimento' : 'Cenário: Caso geral (tributável)'}</div>
-
-<div class="hero">
-  <div class="hero-label">IRS estimado sobre a mais-valia</div>
-  <div class="hero-value">${fmtEuro(out.irsIsolado)}</div>
-</div>
-
-<h2>Dados introduzidos</h2>
-<div class="rows">
-<div class="row"><span class="lbl">Data de aquisição</span><span class="val">${fmtDate(inp.dataCompra)}</span></div>
-<div class="row"><span class="lbl">Data de venda</span><span class="val">${fmtDate(inp.dataVenda)}</span></div>
-<div class="row"><span class="lbl">Valor de aquisição</span><span class="val">${fmtEuro(inp.valorCompra)}</span></div>
-<div class="row"><span class="lbl">Valor de venda</span><span class="val">${fmtEuro(inp.valorVenda)}</span></div>
-<div class="row"><span class="lbl">Despesas dedutíveis</span><span class="val">${fmtEuro(out.totalDespesas)}</span></div>
-${isHPP ? `
-<div class="row"><span class="lbl">Capital em dívida</span><span class="val">${fmtEuro(inp.hpp?.dividaBanco)}</span></div>
-<div class="row"><span class="lbl">Valor nova HPP</span><span class="val">${fmtEuro(inp.hpp?.novaValor)}</span></div>
-<div class="row"><span class="lbl">% financiada nova HPP</span><span class="val">${inp.hpp?.novaPercent ?? 0}%</span></div>
-` : ''}
-</div>
-
-<h2>Resultados</h2>
-<div class="grid">
-  <div class="card"><div class="lbl">Mais-valia bruta</div><div class="val">${fmtEuro(out.maisValia)}</div></div>
-  <div class="card"><div class="lbl">Tributável 50%</div><div class="val">${fmtEuro(out.tributavel50)}</div></div>
-  ${isHPP ? `
-  <div class="card"><div class="lbl">Ganho da venda</div><div class="val">${fmtEuro(out.ganhoVenda)}</div></div>
-  <div class="card"><div class="lbl">Reinvestido (próprio)</div><div class="val">${fmtEuro(out.valorReinvestido)}</div></div>
-  <div class="card"><div class="lbl">Não reinvestido</div><div class="val">${fmtEuro(out.valorNaoReinvestido)}</div></div>
-  ` : ''}
-  <div class="card"><div class="lbl">Tributável final</div><div class="val">${fmtEuro(out.tributavelFinal)}</div></div>
-  <div class="card"><div class="lbl">Taxa efetiva</div><div class="val">${out.tributavelFinal > 0 ? fmtPct(out.taxaEfetiva) : 'n/a'}</div></div>
-</div>
+${bodyHtml}
 
 <div class="disclaimer">
   <strong>Nota importante:</strong> Este relatório apresenta o IRS isolado sobre esta mais-valia, calculado com a taxa e parcela a abater do escalão correspondente. O imposto real depende do <strong>englobamento</strong> com os restantes rendimentos do agregado e pode ser superior ou inferior consoante o escalão marginal aplicável. Para confirmação técnica, agende consultoria com a equipa FINMED.

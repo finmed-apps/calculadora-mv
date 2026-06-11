@@ -6,7 +6,10 @@ import { CalcForm } from '../components/CalcForm';
 import { Result } from '../components/Result';
 import { Faq } from '../components/Faq';
 import { InfoScreen } from '../components/InfoScreen';
-import { calcular, formatEuro, formatDate } from '../lib/calc';
+import { DoacaoForm, DoacaoResult } from '../components/DoacaoSim';
+import { HerancaForm, HerancaResult } from '../components/HerancaSim';
+import { HSForm, HSResult } from '../components/HSSim';
+import { calcular, calcularDoacao, calcularHeranca, calcularHS, formatEuro, formatDate } from '../lib/calc';
 import { exportarPdf } from '../lib/pdf';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -71,7 +74,11 @@ export function CalculatorPage() {
 
   function handleCalculate(inputs) {
     try {
-      const out = calcular(inputs);
+      let out;
+      if (scenario === 'doacao') out = calcularDoacao(inputs);
+      else if (scenario === 'heranca') out = calcularHeranca(inputs);
+      else if (scenario === 'hs_novo') out = calcularHS(inputs);
+      else out = calcular(inputs);
       setSavedId(null);  // novo cálculo, mesmo se vier de prefill
       const reduce = typeof window !== 'undefined' && window.matchMedia
         && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -101,7 +108,7 @@ export function CalculatorPage() {
     try {
       const row = await save({
         label,
-        scenario: result.inputs.scenario,
+        scenario: result.scenario || result.inputs.scenario,
         inputs: result.inputs,
         outputs: extractOutputs(result),
       });
@@ -150,6 +157,7 @@ export function CalculatorPage() {
   }
 
   // --- RENDER ---
+  const rsc = result?.scenario || result?.inputs?.scenario;
   return (
     <main className="max-w-6xl mx-auto px-5 py-8 sm:py-12 space-y-5">
       <OnboardingModal open={showOnboarding} onClose={closeOnboarding} />
@@ -177,10 +185,21 @@ export function CalculatorPage() {
         />
       )}
 
+      {/* Novos simuladores */}
+      {scenario === 'doacao' && !result && !calculating && (
+        <DoacaoForm prefill={prefill} onCancel={handleReset} onCalculate={handleCalculate} />
+      )}
+      {scenario === 'heranca' && !result && !calculating && (
+        <HerancaForm prefill={prefill} onCancel={handleReset} onCalculate={handleCalculate} />
+      )}
+      {scenario === 'hs_novo' && !result && !calculating && (
+        <HSForm prefill={prefill} onCancel={handleReset} onCalculate={handleCalculate} />
+      )}
+
       {/* Efeito "a calcular" antes de revelar o resultado */}
       {calculating && <CalculatingOverlay />}
 
-      {result && (
+      {result && (rsc === 'geral' || rsc === 'hpp') && (
         <>
           <Result
             result={result}
@@ -195,6 +214,9 @@ export function CalculatorPage() {
           <Faq />
         </>
       )}
+      {result && rsc === 'doacao' && <DoacaoResult result={result} onEdit={handleEdit} onReset={handleReset} onSave={handleSave} onExportPdf={handleExportPdf} saving={saving} savedId={savedId} />}
+      {result && rsc === 'heranca' && <HerancaResult result={result} onEdit={handleEdit} onReset={handleReset} onSave={handleSave} onExportPdf={handleExportPdf} saving={saving} savedId={savedId} />}
+      {result && rsc === 'hs_novo' && <HSResult result={result} onEdit={handleEdit} onReset={handleReset} onSave={handleSave} onExportPdf={handleExportPdf} saving={saving} savedId={savedId} />}
     </main>
   );
 }
@@ -244,7 +266,7 @@ function RecentSimulations({ items }) {
 }
 
 function scenarioName(s) {
-  const map = { hpp: 'HPP', geral: 'Geral', pre1989: 'Pré-1989', estado: 'Estado' };
+  const map = { hpp: 'HPP', geral: 'Geral', pre1989: 'Pré-1989', estado: 'Estado', doacao: 'Doação', heranca: 'Herança', hs_novo: 'HS Reinvest.' };
   return map[s] || s;
 }
 
@@ -265,6 +287,34 @@ function Hero() {
 // Helpers para serializar/desserializar resultado
 // ============================================================
 function extractOutputs(result) {
+  const sc = result.scenario || result.inputs?.scenario;
+  if (sc === 'doacao') {
+    return {
+      irsIsolado: result.irs, maisValia: result.maisValiaBruta, tributavelFinal: result.mvEnglobada,
+      taxaEfetiva: result.taxaEfetiva, valorAquisicao: result.valorAquisicao, coef: result.coef,
+      coefInfo: result.coefInfo, totalDespesas: result.totalDespesas, mvEnglobada: result.mvEnglobada,
+      maisValiaBruta: result.maisValiaBruta, tipoDoacao: result.tipoDoacao, alerts: result.alerts,
+    };
+  }
+  if (sc === 'heranca') {
+    return {
+      irsIsolado: result.irs, maisValia: result.totalMV, tributavelFinal: result.mvEnglobada,
+      taxaEfetiva: result.taxaEfetiva, aq1: result.aq1, aq2: result.aq2, mv1: result.mv1, mv2: result.mv2,
+      coef1: result.coef1, coef2: result.coef2, totalMV: result.totalMV, mvEnglobada: result.mvEnglobada,
+      totalDespesas: result.totalDespesas, alerts: result.alerts,
+    };
+  }
+  if (sc === 'hs_novo') {
+    return {
+      irsIsolado: result.irs, maisValia: result.maisValiaBruta, tributavelFinal: result.mvTributavelFinal ?? 0,
+      taxaEfetiva: result.taxaEfetiva, coef: result.coef, coefInfo: result.coefInfo, totalDespesas: result.totalDespesas,
+      maisValiaBruta: result.maisValiaBruta, mvTributavelBase: result.mvTributavelBase, ganho: result.ganho,
+      finMax: result.finMax, valorReinvestido: result.valorReinvestido, valorNaoReinvestido: result.valorNaoReinvestido,
+      proporcaoNaoReinv: result.proporcaoNaoReinv, mvTributavelFinal: result.mvTributavelFinal, estado: result.estado,
+      dentroJanela: result.dentroJanela, temNovaCasa: result.temNovaCasa, alerts: result.alerts,
+    };
+  }
+  // geral / hpp (existente)
   return {
     maisValia: result.maisValia,
     tributavel50: result.tributavel50,
@@ -283,8 +333,10 @@ function extractOutputs(result) {
 }
 
 function reconstructResult(sim) {
-  // Re-correr o cálculo para ter alerts atualizados (estrutura pode ter mudado)
-  // mas usar inputs guardados
-  const fresh = calcular(sim.inputs);
-  return fresh;
+  // Re-correr o cálculo com os inputs guardados (alerts/estrutura atualizados).
+  const sc = sim.inputs?.scenario;
+  if (sc === 'doacao') return calcularDoacao(sim.inputs);
+  if (sc === 'heranca') return calcularHeranca(sim.inputs);
+  if (sc === 'hs_novo') return calcularHS(sim.inputs);
+  return calcular(sim.inputs);
 }
